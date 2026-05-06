@@ -172,12 +172,56 @@ main{flex:1;padding:32px;position:relative; width: 100%;}
 .swipe-btn.like:hover { background: var(--green); color: var(--bg-sec); transform:scale(1.1) rotate(5deg); box-shadow: 0 15px 25px rgba(22,163,74,0.4);}
 
 @keyframes fadeUp{ from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+
+/* ═══════════════════════════════════════════
+   МОБІЛЬНА АДАПТАЦІЯ (TELEPHONE VIEW)
+═══════════════════════════════════════════ */
+.mobile-menu-btn { display: none; background: transparent; border: none; color: var(--text); font-size: 28px; cursor: pointer; padding: 0 10px 0 0; }
+.mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150; backdrop-filter: blur(4px); opacity: 0; transition: var(--anim); }
+.mobile-overlay.open { display: block; opacity: 1; }
+.aside-close { display: none; }
+
+@media (max-width: 850px) {
+  .app { flex-direction: column; }
+  header { padding: 16px; height: auto; }
+  .header-top { justify-content: flex-start; gap: 12px; }
+  .mobile-menu-btn { display: block; }
+  .logo { margin-right: auto; }
+  .header-stats { display: none; } /* Ховаємо стату в хедері для економії місця на мобільному */
+  .search-wrap { margin-top: 12px; }
+
+  /* Бокова панель стає висувним меню */
+  aside { 
+    position: fixed; left: -100%; top: 0; height: 100vh; width: 85%; max-width: 360px; 
+    z-index: 200; box-shadow: 10px 0 30px rgba(0,0,0,0.5); 
+    padding-top: 60px; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  aside.open { left: 0; }
+  .aside-close { 
+    display: flex; align-items: center; justify-content: center; 
+    position: absolute; top: 16px; right: 16px; 
+    background: var(--surface); border: 2px solid var(--border); 
+    width: 40px; height: 40px; border-radius: 50%; 
+    color: var(--text); font-size: 18px; cursor: pointer; font-weight: bold;
+  }
+
+  main { padding: 16px; }
+  .view-controls { display: none; } /* На телефоні приховуємо кнопки 1,2,3 - сітка автоматична 1 колонка */
+  #productsGrid { grid-template-columns: 1fr; gap: 16px; } 
+  .product-card { height: 420px; }
+  #swipeView { height: 500px; }
+  .swipe-card { width: 300px; height: 460px; }
+}
 </style>
 </head>
 <body>
 
+<!-- Затемнення фону при відкритому меню на телефоні -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleMenu()"></div>
+
 <header>
   <div class="header-top">
+    <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
     <a class="logo" href="#">
       <div class="logo-icon">ATB</div>
       <div class="logo-text">Акції<span>&nbsp;PRO</span></div>
@@ -194,7 +238,9 @@ main{flex:1;padding:32px;position:relative; width: 100%;}
 
 <div class="app">
   <aside>
-    <div class="sidebar-label">Візуальне оформлення</div>
+    <button class="aside-close" onclick="toggleMenu()">✕</button>
+
+    <div class="sidebar-label" style="margin-top:0;">Візуальне оформлення</div>
     <select id="themeSelect" class="theme-select" onchange="changeTheme(this.value)">
       <option value="light">🛒 АТБ Класика (Світла)</option>
       <option value="cyber">🦾 Кіберпанк 2077</option>
@@ -280,6 +326,24 @@ const el = id => document.getElementById(id);
 const toF = v => { const n = parseFloat(String(v||'').replace(',','.')); return isNaN(n) ? null : n; };
 const discInt = v => { const m = String(v||'').match(/-?(\d+)/); return m ? parseInt(m[1]) : null; };
 
+// Мобільне меню
+function toggleMenu() {
+  const aside = document.querySelector('aside');
+  const overlay = el('mobileOverlay');
+  aside.classList.toggle('open');
+  if(aside.classList.contains('open')) {
+    overlay.classList.add('open'); document.body.style.overflow = 'hidden';
+  } else {
+    overlay.classList.remove('open'); document.body.style.overflow = '';
+  }
+}
+
+function closeMenuOnMobile() {
+  if (window.innerWidth <= 850 && document.querySelector('aside').classList.contains('open')) {
+    toggleMenu();
+  }
+}
+
 // ЗМІНА ТЕМИ
 const savedTheme = localStorage.getItem('atb_theme_v4') || 'light';
 el('themeSelect').value = savedTheme;
@@ -289,6 +353,7 @@ function changeTheme(themeName) {
   if (themeName === 'light') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', themeName);
   localStorage.setItem('atb_theme_v4', themeName);
+  closeMenuOnMobile();
 }
 
 // ЗМІНА ВИГЛЯДУ (СІТКА / СВАЙП)
@@ -327,20 +392,20 @@ async function loadCatalog(){
         allProducts.push(...data.products.filter(p=>{
           const key = p.link||p.title; return !allProducts.some(x=>(x.link||x.title)===key);
         }));
-        applyFilters();
+        applyFilters(false);
       } else break;
     } catch(e){ console.error(e); }
   }
   el('btnLoad').textContent = '📥 Завантажити'; el('btnLoad').disabled = false;
-  applyFilters();
+  applyFilters(true);
 }
 
-function clearAll(){ allProducts = []; applyFilters(); }
+function clearAll(){ allProducts = []; applyFilters(true); }
 
 // ПОШУК
 el('searchInput').addEventListener('input', () => {
   const q = el('searchInput').value.trim();
-  clearTimeout(searchTimer); applyFilters();
+  clearTimeout(searchTimer); applyFilters(false);
   if(q && filteredProducts.length < 3) searchTimer = setTimeout(()=>fireSmartSearch(q), 800);
 });
 
@@ -351,7 +416,7 @@ async function fireSmartSearch(q){
     const data = await resp.json();
     if(data.products) data.products.forEach(p => { if(!allProducts.some(x=>x.link===p.link)) allProducts.push(p); });
   } catch(e){}
-  el('searchBadge').classList.remove('visible'); applyFilters();
+  el('searchBadge').classList.remove('visible'); applyFilters(false);
 }
 
 // 15 ШВИДКИХ ФІЛЬТРІВ
@@ -361,11 +426,11 @@ document.querySelectorAll('.q-btn').forEach(btn => {
     const filter = e.target.getAttribute('data-filter');
     if(filter === 'reset') { activeQuickFilter = null; el('searchInput').value = ''; }
     else { activeQuickFilter = filter; e.target.classList.add('active'); }
-    applyFilters();
+    applyFilters(true);
   });
 });
 
-function applyFilters(){
+function applyFilters(closeMobile = false){
   const q = el('searchInput').value.trim().toLowerCase();
   filteredProducts = allProducts.filter(p=>{
     const price = toF(p.current_price), sav = p.saving, disc = discInt(p.discount);
@@ -378,7 +443,7 @@ function applyFilters(){
       if(activeQuickFilter === '100to200' && (price < 100 || price > 200)) return false;
       if(activeQuickFilter === 'over300' && price <= 300) return false;
       if(activeQuickFilter === 'disc30' && (!disc || disc < 30)) return false;
-      if(activeQuickFilter === 'disc50' && (!disc || disc >= 50)) return false; // Fixed >= 50
+      if(activeQuickFilter === 'disc50' && (!disc || disc >= 50)) return false; 
       if(activeQuickFilter === 'sav20' && (!sav || sav < 20)) return false;
       if(activeQuickFilter === 'sav50' && (!sav || sav < 50)) return false;
       if(activeQuickFilter === 'maxProfit' && (!disc || disc < 50 || !sav || sav < 50)) return false;
@@ -393,13 +458,14 @@ function applyFilters(){
   if(isSwipeMode) { swipeIndex=0; renderSwipe(); } else renderGrid();
   el('totalCount').textContent = allProducts.length;
   el('resultsCount').innerHTML = `Відображено <strong>${filteredProducts.length}</strong> товарних позицій`;
+  if (closeMobile) closeMenuOnMobile();
 }
 
 // 10 АЛГОРИТМІВ СОРТУВАННЯ
 function setSort(type, element){
   currentSort = type;
   document.querySelectorAll('.sort-pill').forEach(p=>p.classList.remove('active'));
-  element.classList.add('active'); applyFilters();
+  element.classList.add('active'); applyFilters(true);
 }
 
 function sortProducts(){
@@ -499,7 +565,6 @@ function setupSwipeEvents(card, idx) {
     if(!isDown) return; 
     currentX = (e.type.includes('mouse') ? e.pageX : e.touches[0].clientX) - startX; 
     card.style.transform = `translateX(${currentX}px) rotate(${currentX*0.08}deg)`; 
-    // Візуальний зворотний зв'язок (колір бордера)
     if(currentX > 50) card.style.borderColor = 'var(--green)';
     else if(currentX < -50) card.style.borderColor = 'var(--text3)';
     else card.style.borderColor = '';
