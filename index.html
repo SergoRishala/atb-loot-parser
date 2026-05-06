@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>ATB PRO: Аналітика & Сортування</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -13,7 +13,6 @@
    5 КАРДИНАЛЬНО РІЗНИХ ТЕМ
 ═══════════════════════════════════════════ */
 :root {
-  /* 1. КЛАСИКА (Базова) */
   --font-main: 'Geologica', sans-serif; --font-title: 'Unbounded', sans-serif;
   --bg: #f3f4f6; --bg-sec: #ffffff; --surface: #ffffff;
   --text: #111827; --text2: #4b5563; --text3: #9ca3af;
@@ -25,15 +24,13 @@
   --img-bg: transparent; --img-blend: multiply;
 }
 
-/* 2. КІБЕРПАНК 2077 */
 [data-theme="cyber"] {
   --font-main: 'Unbounded', sans-serif; --font-title: 'Unbounded', sans-serif;
   --bg: #fce300; --bg-sec: #000000; --surface: #111111;
   --text: #00ffff; --text2: #ffffff; --text3: #666666;
   --border: #ff003c; --border-focus: #00ffff;
   --red: #ff003c; --green: #00ff00; --yellow: #fce300;
-  --card-r: 0px; --card-border: none;
-  --card-shadow: none; --btn-radius: 0px;
+  --card-r: 0px; --card-border: none; --card-shadow: none; --btn-radius: 0px;
   --img-bg: #ffffff; --img-blend: normal;
 }
 [data-theme="cyber"] .product-card { border-left: 6px solid #00ffff; border-bottom: 6px solid #ff003c; clip-path: polygon(30px 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px); }
@@ -42,7 +39,6 @@
 [data-theme="cyber"] .card-img { background: #fff; padding: 10px; clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px); }
 [data-theme="cyber"] body::before { background: repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(0,255,255,0.05) 4px, rgba(0,255,255,0.05) 8px); z-index: -1; }
 
-/* 3. САКУРА (Каваї) */
 [data-theme="sakura"] {
   --font-main: 'Nunito', sans-serif; --font-title: 'Caveat', cursive;
   --bg: #fdf2f8; --bg-sec: #fce7f3; --surface: #ffffff;
@@ -50,15 +46,13 @@
   --border: #fbcfe8; --border-focus: #db2777;
   --red: #f472b6; --green: #10b981; --yellow: #fde047;
   --card-r: 30px; --card-border: 2px dashed #fbcfe8;
-  --card-shadow: 0 10px 25px rgba(244,114,182,0.15);
-  --btn-radius: 24px;
+  --card-shadow: 0 10px 25px rgba(244,114,182,0.15); --btn-radius: 24px;
   --img-bg: transparent; --img-blend: multiply;
 }
 [data-theme="sakura"] .product-card:hover { transform: translateY(-12px) rotate(2deg); box-shadow: 0 20px 40px rgba(244,114,182,0.3); border-color: #f472b6; }
 [data-theme="sakura"] .price-current { font-size: 28px; }
 [data-theme="sakura"] body::before { background: radial-gradient(circle at 20% 30%, rgba(244,114,182,0.2) 0%, transparent 40%), radial-gradient(circle at 80% 70%, rgba(251,207,232,0.4) 0%, transparent 40%); }
 
-/* 4. БРУТАЛІЗМ */
 [data-theme="brutal"] {
   --font-main: 'Space Mono', monospace; --font-title: 'Unbounded', sans-serif;
   --bg: #e0dcd0; --bg-sec: #ffffff; --surface: #ffffff;
@@ -66,15 +60,13 @@
   --border: #000000; --border-focus: #e8001c;
   --red: #e8001c; --green: #000000; --yellow: #ffd600;
   --card-r: 0px; --card-border: 4px solid #000000;
-  --card-shadow: 8px 8px 0 #000000;
-  --btn-radius: 0px;
+  --card-shadow: 8px 8px 0 #000000; --btn-radius: 0px;
   --img-bg: transparent; --img-blend: multiply;
 }
 [data-theme="brutal"] .product-card:hover { transform: translate(-6px, -6px); box-shadow: 14px 14px 0 #e8001c; border-color: #e8001c; }
 [data-theme="brutal"] .btn { border: 3px solid #000; font-weight: 900; text-transform: uppercase; box-shadow: 4px 4px 0 #000; }
 [data-theme="brutal"] .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #000; }
 
-/* 5. ХАКЕР / ТЕРМІНАЛ */
 [data-theme="hacker"] {
   --font-main: 'Space Mono', monospace; --font-title: 'Space Mono', monospace;
   --bg: #050505; --bg-sec: #000000; --surface: #0a0a0a;
@@ -90,7 +82,7 @@
 [data-theme="hacker"] body::before { background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,0,0.03) 2px, rgba(0,255,0,0.03) 4px); }
 
 /* ═══════════════════════════════════════════
-   БАЗОВИЙ CSS (Універсальний)
+   БАЗОВИЙ CSS
 ═══════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{ font-family:var(--font-main); background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; transition: background 0.3s; }
@@ -103,53 +95,32 @@ header{ position:sticky;top:0;z-index:100; background:var(--bg-sec); border-bott
 #searchInput:focus{ border-color:var(--border-focus); }
 
 .app{display:flex;min-height:calc(100vh - 70px);}
-aside{ width:320px;flex-shrink:0;background:var(--bg-sec);border-right:1px solid var(--border);padding:24px;position:sticky;top:70px;height:calc(100vh - 70px);overflow-y:auto;scrollbar-width:none; }
+aside{ width:320px;flex-shrink:0;background:var(--bg-sec);border-right:1px solid var(--border);padding:24px;position:sticky;top:70px;height:calc(100vh - 70px);overflow-y:auto;scrollbar-width:none; transition: var(--anim); }
 .sidebar-label{ font-family:var(--font-title);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:12px; margin-top:24px;}
 .btn{ display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:var(--btn-radius);border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;transition:var(--anim);color:var(--bg-sec);background:var(--red); }
 .btn:hover{ filter:brightness(1.1); }
 .btn-secondary{ background:var(--surface);color:var(--text);border:1px solid var(--border); }
 .theme-select { width: 100%; background: var(--surface); border: 2px solid var(--border); color: var(--text); padding: 12px; border-radius: var(--btn-radius); font-family: inherit; font-size: 14px; outline: none; cursor: pointer; font-weight:700; margin-bottom: 10px;}
 
-/* QUICK FILTERS (10 кнопок) */
 .quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .q-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text2); padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; transition: var(--anim); }
 .q-btn:hover { background: var(--red); color: var(--bg-sec); border-color: var(--red); }
-.q-btn.active { background: var(--red); color: var(--bg-sec); border-color: var(--red); box-shadow: 0 0 10px var(--red-glow); }
+.q-btn.active { background: var(--red); color: var(--bg-sec); border-color: var(--red); box-shadow: 0 0 10px rgba(232,0,28,0.2); }
 
-main{flex:1;padding:32px;position:relative;}
+main{flex:1;padding:32px;position:relative; width: 100%;}
 .results-count{ font-size:16px;color:var(--text2);font-weight:700; margin-bottom: 20px;}
 
 /* ═══════════════════════════════════════════
    3D КАРТКИ З ПЕРЕГОРТАННЯМ
 ═══════════════════════════════════════════ */
-#productsGrid{ display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:24px; perspective: 1500px; }
-
-.product-card {
-  width: 100%; height: 440px; /* Фіксована висота для правильного 3D */
-  perspective: 1500px; background: transparent; cursor: pointer;
-  animation:fadeUp .4s ease both;
-}
-.card-inner {
-  position: relative; width: 100%; height: 100%;
-  text-align: left; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-style: preserve-3d;
-}
+#productsGrid{ display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:24px; perspective: 1500px; }
+.product-card { width: 100%; height: 440px; perspective: 1500px; background: transparent; cursor: pointer; animation:fadeUp .4s ease both; }
+.card-inner { position: relative; width: 100%; height: 100%; text-align: left; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
 .product-card.flipped .card-inner { transform: rotateY(180deg); }
 
-.card-front, .card-back {
-  position: absolute; width: 100%; height: 100%;
-  backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  background: var(--surface); border: var(--card-border);
-  border-radius: var(--card-r); box-shadow: var(--card-shadow);
-  display: flex; flex-direction: column; overflow: hidden;
-  transition: var(--anim);
-}
+.card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--surface); border: var(--card-border); border-radius: var(--card-r); box-shadow: var(--card-shadow); display: flex; flex-direction: column; overflow: hidden; transition: var(--anim); }
 .card-front:hover { border-color: var(--border-focus); }
-.card-back {
-  transform: rotateY(180deg); padding: 20px;
-  background: var(--bg-sec); overflow-y: auto;
-  border-color: var(--border-focus);
-}
+.card-back { transform: rotateY(180deg); padding: 20px; background: var(--bg-sec); overflow-y: auto; border-color: var(--border-focus); }
 
 .card-img-wrap{ position:relative;height:200px;padding:16px;display:flex;align-items:center;justify-content:center;background:var(--img-bg); }
 .card-img{ max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:var(--img-blend); }
@@ -160,11 +131,9 @@ main{flex:1;padding:32px;position:relative;}
 .card-title{ font-size:14px;font-weight:600;line-height:1.4;color:var(--text);margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
 .price-current{ font-family:var(--font-title);font-size:26px;font-weight:800;color:var(--red); }
 .price-old{ font-size:13px;color:var(--text3);text-decoration:line-through;font-weight:600; }
-
 .click-hint { margin-top:auto; font-size: 11px; color: var(--text3); text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display:flex; align-items:center; justify-content:center; gap:5px;}
 .click-hint::after { content: '↻'; font-size: 14px;}
 
-/* Стилі для Зворотної сторони (Характеристики) */
 .back-title { font-family: var(--font-title); font-size: 14px; color: var(--text); margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;}
 .chars-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;}
 .chars-table tr { border-bottom: 1px dashed var(--border); }
@@ -173,36 +142,76 @@ main{flex:1;padding:32px;position:relative;}
 .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top: 3px solid var(--red); border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* ═══════════════════════════════════════════
-   АНАЛІТИКА
-═══════════════════════════════════════════ */
-.analytics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 20px; }
+/* АНАЛІТИКА */
+.analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 20px; }
 .an-card { background: var(--surface); border: var(--card-border); padding: 20px; border-radius: var(--card-r); text-align: center; }
 .an-val { font-family: var(--font-title); font-size: 26px; font-weight: 800; color: var(--red); margin-bottom: 4px; }
 .an-label { font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase;}
 .an-full { grid-column: 1 / -1; display:flex; justify-content: space-between; align-items: center; text-align:left;}
 
 @keyframes fadeUp{ from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+/* ═══════════════════════════════════════════
+   МОБІЛЬНА АДАПТАЦІЯ (TELEPHONE VIEW)
+═══════════════════════════════════════════ */
+.mobile-menu-btn { display: none; background: transparent; border: none; color: var(--text); font-size: 26px; cursor: pointer; padding: 0 10px 0 0; }
+.mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150; backdrop-filter: blur(4px); opacity: 0; transition: var(--anim); }
+.mobile-overlay.open { display: block; opacity: 1; }
+.aside-close { display: none; }
+
+@media (max-width: 850px) {
+  .app { flex-direction: column; }
+  
+  header { flex-wrap: wrap; height: auto; padding: 12px 16px; gap: 10px; }
+  .mobile-menu-btn { display: block; }
+  .logo { margin-right: auto; }
+  .header-stats { display: none; } /* Ховаємо стату в хедері для економії місця */
+  .search-wrap { order: 4; width: 100%; max-width: 100%; margin-top: 6px; }
+
+  /* Бокова панель стає висувним меню */
+  aside { 
+    position: fixed; left: -100%; top: 0; height: 100vh; width: 85%; max-width: 340px; 
+    z-index: 200; box-shadow: 10px 0 30px rgba(0,0,0,0.5); 
+    padding-top: 60px; /* Місце для кнопки закриття */
+  }
+  aside.open { left: 0; }
+  .aside-close { 
+    display: flex; align-items: center; justify-content: center; 
+    position: absolute; top: 16px; right: 16px; 
+    background: var(--surface); border: 1px solid var(--border); 
+    width: 36px; height: 36px; border-radius: 50%; 
+    color: var(--text); font-size: 16px; cursor: pointer; font-weight: bold;
+  }
+
+  main { padding: 16px; }
+  #productsGrid { grid-template-columns: 1fr; gap: 16px; } /* Одна колонка на телефоні */
+  .product-card { height: 420px; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .an-full { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
 </style>
 </head>
 <body>
 
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleMenu()"></div>
+
 <header>
+  <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
   <a class="logo" href="#">
     <div class="logo-icon">ATB</div>
     <div class="logo-text">Акції<span>&nbsp;PRO</span></div>
   </a>
-  <div class="search-wrap">
-    <input id="searchInput" type="text" placeholder="Пошук товарів..."/>
-    <span id="searchBadge">Шукаю...</span>
-  </div>
   <div class="header-stats">
     <div class="stat-chip"><span class="num" id="totalCount">0</span>&nbsp;в базі</div>
+  </div>
+  <div class="search-wrap">
+    <input id="searchInput" type="text" placeholder="Пошук товарів..."/>
   </div>
 </header>
 
 <div class="app">
   <aside>
+    <button class="aside-close" onclick="toggleMenu()">✕</button>
     <select id="themeSelect" class="theme-select" onchange="changeTheme(this.value)">
       <option value="light">🛒 АТБ Класика (Світла)</option>
       <option value="cyber">🦾 Кіберпанк 2077</option>
@@ -247,14 +256,12 @@ main{flex:1;padding:32px;position:relative;}
 
   <main>
     <div class="results-count" id="resultsCount">Завантажте каталог для початку роботи</div>
-
-    <!-- СТАТИСТИКА (Прихована за замовчуванням) -->
+    
     <div id="analyticsPanel" style="display:none; margin-bottom:30px;">
       <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">Аналітика по відфільтрованим товарам</h2>
       <div class="analytics-grid" id="analyticsGrid"></div>
     </div>
 
-    <!-- СІТКА КАРТОК -->
     <div id="productsGrid"></div>
   </main>
 </div>
@@ -269,6 +276,18 @@ const el = id => document.getElementById(id);
 const toF = v => { const n = parseFloat(String(v||'').replace(',','.')); return isNaN(n) ? null : n; };
 const discInt = v => { const m = String(v||'').match(/-?(\d+)/); return m ? parseInt(m[1]) : null; };
 
+// Мобільне меню
+function toggleMenu() {
+  const aside = document.querySelector('aside');
+  const overlay = el('mobileOverlay');
+  aside.classList.toggle('open');
+  if(aside.classList.contains('open')) {
+    overlay.classList.add('open'); document.body.style.overflow = 'hidden';
+  } else {
+    overlay.classList.remove('open'); document.body.style.overflow = '';
+  }
+}
+
 // ТЕМИ
 const savedTheme = localStorage.getItem('atb_theme_v3') || 'light';
 el('themeSelect').value = savedTheme;
@@ -278,6 +297,7 @@ function changeTheme(themeName) {
   if (themeName === 'light') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', themeName);
   localStorage.setItem('atb_theme_v3', themeName);
+  if(window.innerWidth <= 850) toggleMenu(); // Закриваємо меню на мобільному після вибору
 }
 
 // ЗАВАНТАЖЕННЯ ДАНИХ
@@ -298,10 +318,11 @@ async function loadCatalog(){
     } catch(e){ console.error(e); }
   }
   el('btnLoad').textContent = '📥 Завантажити'; el('btnLoad').disabled = false;
+  if(window.innerWidth <= 850 && document.querySelector('aside').classList.contains('open')) toggleMenu();
   applyFilters();
 }
 
-function clearAll(){ allProducts = []; applyFilters(); el('analyticsPanel').style.display = 'none'; }
+function clearAll(){ allProducts = []; applyFilters(); el('analyticsPanel').style.display = 'none'; if(window.innerWidth <= 850) toggleMenu();}
 
 // ПОШУК
 el('searchInput').addEventListener('input', () => {
@@ -312,16 +333,14 @@ el('searchInput').addEventListener('input', () => {
 });
 
 async function fireSmartSearch(q){
-  el('searchBadge').classList.add('visible'); el('searchBadge').textContent = "Шукаю на АТБ...";
   try{
     const resp = await fetch(`${API}/search/page?q=${encodeURIComponent(q)}&page=1`);
     const data = await resp.json();
     if(data.products) {
-      // Додаємо знайдене в загальну базу
       data.products.forEach(p => { if(!allProducts.some(x=>x.link===p.link)) allProducts.push(p); });
     }
   } catch(e){}
-  el('searchBadge').classList.remove('visible'); applyFilters();
+  applyFilters();
 }
 
 // 10 ШВИДКИХ ФІЛЬТРІВ
@@ -332,17 +351,18 @@ document.querySelectorAll('.q-btn').forEach(btn => {
     if(filter === 'reset') { activeQuickFilter = null; el('searchInput').value = ''; }
     else { activeQuickFilter = filter; e.target.classList.add('active'); }
     applyFilters();
+    if(window.innerWidth <= 850) toggleMenu();
   });
 });
 
 // ФІЛЬТРАЦІЯ
 function applyFilters(){
   const q = el('searchInput').value.trim().toLowerCase();
-
+  
   filteredProducts = allProducts.filter(p=>{
     const price = toF(p.current_price), sav = p.saving, disc = discInt(p.discount);
     if(q && !String(p.title).toLowerCase().includes(q)) return false;
-
+    
     if(activeQuickFilter) {
       if(activeQuickFilter === 'under50' && price >= 50) return false;
       if(activeQuickFilter === '50to100' && (price < 50 || price > 100)) return false;
@@ -366,6 +386,7 @@ function setSort(type, element){
   currentSort = type;
   document.querySelectorAll('.sort-pill').forEach(p=>p.classList.remove('active'));
   element.classList.add('active'); applyFilters();
+  if(window.innerWidth <= 850) toggleMenu();
 }
 
 function sortProducts(){
@@ -381,11 +402,9 @@ function renderGrid(){
   filteredProducts.forEach((p, i) => {
     const card = document.createElement('div'); card.className = 'product-card';
     const price = toF(p.current_price), old = toF(p.old_price), disc = discInt(p.discount), sav = p.saving;
-
-    // Структура картки з передньою і задньою стороною
+    
     card.innerHTML = `
       <div class="card-inner">
-        <!-- ПЕРЕДНЯ СТОРОНА -->
         <div class="card-front" onclick="flipCard(this.parentElement.parentElement, '${p.link}')">
           <div class="card-img-wrap">${p.img_url ? `<img class="card-img" src="${p.img_url}"/>` : `<div style="font-size:50px;">🛍</div>`}<div class="card-badges">${disc?`<span class="badge">-${disc}%</span>`:''}${p.is_atb_card?`<span class="badge" style="background:var(--yellow); color:#000;">ATB</span>`:''}</div></div>
           <div class="card-body">
@@ -395,7 +414,6 @@ function renderGrid(){
             <div class="click-hint">Характеристики</div>
           </div>
         </div>
-        <!-- ЗВОРОТНА СТОРОНА -->
         <div class="card-back">
           <div class="back-title">${p.title}</div>
           <div class="card-back-content"><div class="spinner"></div></div>
@@ -413,28 +431,26 @@ function renderGrid(){
 // Функція перегортання та завантаження деталей з бекенду
 async function flipCard(cardEl, link) {
   if(!cardEl.classList.contains('flipped')) {
-    // Відкриваємо картку
-    document.querySelectorAll('.product-card.flipped').forEach(c => c.classList.remove('flipped')); // Закриваємо інші
+    document.querySelectorAll('.product-card.flipped').forEach(c => c.classList.remove('flipped'));
     cardEl.classList.add('flipped');
-
+    
     const contentEl = cardEl.querySelector('.card-back-content');
-    if(contentEl.innerHTML.includes('chars-table')) return; // Вже завантажено
-
+    if(contentEl.innerHTML.includes('chars-table')) return; 
+    
     try {
-      // Виклик API для отримання характеристик (Крок 1 у інструкції)
       const res = await fetch(`/api/details?url=${encodeURIComponent(link)}`);
       const data = await res.json();
-
+      
       if(!data || Object.keys(data).length === 0 || data.error) {
         contentEl.innerHTML = '<p style="font-size:12px; color:var(--text3); text-align:center;">Детальні характеристики відсутні</p>';
         return;
       }
-
+      
       let html = '<table class="chars-table">';
       for(let key in data) html += `<tr><td>${key}</td><td>${data[key]}</td></tr>`;
       html += '</table>';
       contentEl.innerHTML = html;
-
+      
     } catch(e) {
       contentEl.innerHTML = '<p style="font-size:12px; color:var(--red); text-align:center;">Помилка завантаження</p>';
     }
@@ -445,10 +461,11 @@ async function flipCard(cardEl, link) {
 function renderAnalytics() {
   if(!filteredProducts.length) return alert("Немає даних для аналізу!");
   el('analyticsPanel').style.display = 'block';
-
+  if(window.innerWidth <= 850) toggleMenu();
+  
   let totalP = 0, count = 0, maxD = 0, totalSav = 0, under50 = 0;
   let minItem = null, maxItem = null;
-
+  
   filteredProducts.forEach(p => {
     const pr = toF(p.current_price);
     if(pr) {
@@ -460,7 +477,7 @@ function renderAnalytics() {
     const d = discInt(p.discount); if(d > maxD) maxD = d;
     if(p.saving) totalSav += p.saving;
   });
-
+  
   el('analyticsGrid').innerHTML = `
     <div class="an-card"><div class="an-val">${count}</div><div class="an-label">Товарів у вибірці</div></div>
     <div class="an-card"><div class="an-val">${Math.round(totalP/count)||0} ₴</div><div class="an-label">Середня ціна</div></div>
@@ -476,7 +493,6 @@ function renderAnalytics() {
     </div>
   `;
 }
-function randomProduct() { if(filteredProducts.length) window.open(filteredProducts[Math.floor(Math.random() * filteredProducts.length)].link, '_blank'); }
 </script>
 </body>
 </html>
