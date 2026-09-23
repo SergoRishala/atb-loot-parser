@@ -1,0 +1,29 @@
+# Безпека та персональні токени
+.env
+.silpo_mcp_tokens.json
+.silpo_mcp_client.json
+database.json
+
+# Кеш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Архіви та пакети
+*.tgz
+package/
+.metadata.json
+*.metadata.json
+
+# Тимчасові та службові файли Mac
+.DS_Store
+Thumbs.db
+
+# Чорнові тестові та діагностичні скрипти
+test_*.py
+find_*.py
+inspect_*.py
+debug_search.py
+check_prices.py
+verify_all_branches.py
+user_atb_code.txt

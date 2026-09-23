@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>LOOT — Floating Price: АТБ & Сільпо PRO</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+  <link rel="stylesheet" href="/static/style.css?v=2.8"/>
+  <link rel="icon" href="https://silpo.ua/favicon.ico" type="image/x-icon"/>
+  <!-- Штрихкод сканер бібліотека -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+
+<!-- iOS Safari Haptic Switch Trigger Fixture -->
+<div id="haptic-fixture" style="position: fixed; bottom: 0; left: 0; width: 1px; height: 1px; opacity: 0.001; pointer-events: auto; overflow: hidden; z-index: 1;">
+  <label id="haptic-switch-label" for="haptic-switch-input">
+    <input type="checkbox" switch id="haptic-switch-input" tabindex="-1">
+  </label>
+</div>
+
+<!-- 1. ГОЛОВНА ВЕРХНЯ ШАПКА LOOT (ЛОГОТИП, ОПЦІЇ ТА КОШИК) -->
+<div class="header">
+  <a class="logo-wrap" href="/">
+    <div class="logo">
+      LOOT <span>• АТБ & Сільпо</span>
+    </div>
+  </a>
+
+  <div class="header-controls">
+    <!-- Кнопка Опції / Налаштування перенесена до кошика -->
+    <button class="admin-btn" id="adminBtn" onclick="openAdminPanel()" title="Опції, звук, вібрація та налаштування">
+      <i class="fa-solid fa-sliders"></i>
+      <span class="btn-text">Опції</span>
+    </button>
+
+    <!-- Кнопка Кошика -->
+    <button class="cart-btn" id="cartBtn" onclick="openCartPanel()" title="Розумний кошик">
+      <i class="fa-solid fa-basket-shopping"></i>
+      <span>Кошик</span>
+      <span class="cart-badge" id="cartBadge" style="display: none;">0</span>
+    </button>
+  </div>
+</div>
+
+<!-- 2. БІЖУЧІ РЯДКИ КАТЕГОРІЙ (CATEGORIES TICKER) -->
+<div class="categories-wrapper">
+  <div class="cats-row row1" id="row1"></div>
+  <div class="cats-row row2" id="row2"></div>
+</div>
+
+<!-- 3. ОБРАНІ КАТЕГОРІЇ (CHIPS) -->
+<div class="selected-categories-section" id="selectedCategoriesSection">
+  <div class="selected-categories-container">
+    <span class="selected-categories-label">Обрана категорія:</span>
+    <div id="selectedCategoriesList" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+  </div>
+</div>
+
+<!-- 4. ПОШУК ТА КНОПКИ ДІЙ (ВИГЛЯД, ФІЛЬТР, СОРТУВАННЯ) -->
+<div class="search-section">
+  <div class="search-bar-row">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Пошук товарів (напр. молоко, чипси, кава)..." autocomplete="off"/>
+      <div class="search-spinner" id="searchSpinner"></div>
+    </div>
+    
+    <!-- 1. Кнопка зміни режиму перегляду -->
+    <button class="round-action-btn view-toggle-round" id="viewToggleRoundBtn" onclick="cycleViewMode()" title="Змінити вигляд (3D / Сітка / VS)">
+      <i class="fa-solid fa-cube" id="viewToggleRoundIcon"></i>
+    </button>
+
+    <!-- 2. Кнопка Фільтр -->
+    <button class="round-action-btn" id="filterRoundBtn" onclick="toggleFilterMenu(event)" title="Фільтр товарів">
+      <i class="fa-solid fa-sliders"></i>
+    </button>
+
+    <!-- 3. Кнопка Сортування за -->
+    <button class="round-action-btn" id="sortRoundBtn" onclick="toggleSortMenu(event)" title="Сортування товарів">
+      <i class="fa-solid fa-arrow-down-wide-short"></i>
+    </button>
+  </div>
+
+  <!-- Випадаюче меню сортування -->
+  <div class="search-dropdown-menu" id="sortDropdown" style="display: none;">
+    <div class="dropdown-header-row">
+      <div class="dropdown-title">Сортування товарів</div>
+      <span class="dropdown-active-badge" id="sortActiveBadge">⚡ Дефолт</span>
+    </div>
+    <div class="dropdown-list">
+      <button class="dropdown-btn active" data-sort="default" onclick="selectSortOption('default')">
+        <span class="sort-icon">⚡</span>
+        <span class="sort-name">За замовчуванням (акції & топ)</span>
+      </button>
+      
+      <div class="dropdown-separator"></div>
+      <div class="dropdown-group-lbl">⚖️ Нормалізована ціна (за 100 г / 100 мл):</div>
+      <button class="dropdown-btn" data-sort="unit_price_asc" onclick="selectSortOption('unit_price_asc')">
+        <span class="sort-icon">📉</span>
+        <span class="sort-name">Ціна за 100г/мл: від дешевих до дорогих</span>
+      </button>
+      <button class="dropdown-btn" data-sort="unit_price_desc" onclick="selectSortOption('unit_price_desc')">
+        <span class="sort-icon">📈</span>
+        <span class="sort-name">Ціна за 100г/мл: від дорогих до дешевих</span>
+      </button>
+
+      <div class="dropdown-separator"></div>
+      <div class="dropdown-group-lbl">🔥 Знижки та економія:</div>
+      <button class="dropdown-btn" data-sort="saving_desc" onclick="selectSortOption('saving_desc')">
+        <span class="sort-icon">🏷️</span>
+        <span class="sort-name">Найбільша знижка в ₴ (макс. економія)</span>
+      </button>
+      <button class="dropdown-btn" data-sort="discount_desc" onclick="selectSortOption('discount_desc')">
+        <span class="sort-icon">🔥</span>
+        <span class="sort-name">Найбільший відсоток знижки (% знижки)</span>
+      </button>
+
+      <div class="dropdown-separator"></div>
+      <div class="dropdown-group-lbl">💰 Ціна за пачку / одиницю товару:</div>
+      <button class="dropdown-btn" data-sort="price_asc" onclick="selectSortOption('price_asc')">
+        <span class="sort-icon">🪙</span>
+        <span class="sort-name">Від дешевих до дорогих (ціна ↑)</span>
+      </button>
+      <button class="dropdown-btn" data-sort="price_desc" onclick="selectSortOption('price_desc')">
+        <span class="sort-icon">💎</span>
+        <span class="sort-name">Від дорогих до дешевих (ціна ↓)</span>
+      </button>
+
+      <div class="dropdown-separator"></div>
+      <div class="dropdown-group-lbl">🔤 Алфавітний порядок:</div>
+      <button class="dropdown-btn" data-sort="title_asc" onclick="selectSortOption('title_asc')">
+        <span class="sort-icon">🔤</span>
+        <span class="sort-name">За назвою товару (А — Я)</span>
+      </button>
+      <button class="dropdown-btn" data-sort="title_desc" onclick="selectSortOption('title_desc')">
+        <span class="sort-icon">🔡</span>
+        <span class="sort-name">За назвою товару (Я — А)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Випадаюче меню фільтрів -->
+  <div class="search-dropdown-menu" id="filterDropdown" style="display: none;">
+    <div class="dropdown-header-row">
+      <div class="dropdown-title">Фільтри каталогу</div>
+      <button class="dropdown-reset-btn" id="filterResetBtn" onclick="resetAllFilters()" title="Скинути всі фільтри">
+        <i class="fa-solid fa-arrow-rotate-left"></i> Скинути
+      </button>
+    </div>
+    <div class="filter-dropdown-content">
+      <!-- 1. Магазин -->
+      <div class="filter-group">
+        <div class="filter-section-lbl">🏪 Супермаркет:</div>
+        <div class="filter-store-pills">
+          <button class="filter-tag active" id="ftStoreAll" onclick="selectFilterStore('all')">Всі</button>
+          <button class="filter-tag" id="ftStoreAtb" onclick="selectFilterStore('atb')">🔴 АТБ</button>
+          <button class="filter-tag" id="ftStoreSilpo" onclick="selectFilterStore('silpo')">🟠 Сільпо</button>
+        </div>
+      </div>
+
+      <!-- 2. Рівень знижки -->
+      <div class="filter-group">
+        <div class="filter-section-lbl">🔥 Розмір знижки:</div>
+        <div class="filter-pills-wrap">
+          <button class="filter-pill-chip active" id="ftDiscAll" onclick="selectDiscountMinFilter(0)">Всі товари</button>
+          <button class="filter-pill-chip" id="ftDiscAny" onclick="selectDiscountMinFilter(1)">Зі знижкою</button>
+          <button class="filter-pill-chip" id="ftDisc20" onclick="selectDiscountMinFilter(20)">≥ 20%</button>
+          <button class="filter-pill-chip" id="ftDisc30" onclick="selectDiscountMinFilter(30)">≥ 30%</button>
+          <button class="filter-pill-chip" id="ftDisc50" onclick="selectDiscountMinFilter(50)">≥ 50% 💥</button>
+        </div>
+      </div>
+
+      <!-- 3. Ціновий діапазон -->
+      <div class="filter-group">
+        <div class="filter-section-lbl">💰 Ціновий діапазон:</div>
+        <div class="filter-pills-wrap">
+          <button class="filter-pill-chip active" id="ftPriceAll" onclick="selectPriceRangeFilter('all')">Всі ціни</button>
+          <button class="filter-pill-chip" id="ftPriceUnder50" onclick="selectPriceRangeFilter('0-50')">до 50 ₴</button>
+          <button class="filter-pill-chip" id="ftPrice50to100" onclick="selectPriceRangeFilter('50-100')">50–100 ₴</button>
+          <button class="filter-pill-chip" id="ftPrice100to250" onclick="selectPriceRangeFilter('100-250')">100–250 ₴</button>
+          <button class="filter-pill-chip" id="ftPriceAbove250" onclick="selectPriceRangeFilter('250+')">250+ ₴</button>
+        </div>
+      </div>
+
+      <!-- 4. Спеціальні опції -->
+      <div class="filter-group">
+        <div class="filter-section-lbl">⚙️ Спеціальні опції:</div>
+        <label class="filter-check-row">
+          <input type="checkbox" id="chkOnlyWithWeight" onchange="toggleOnlyWithWeightFilter(this.checked)"/>
+          <span>⚖️ Тільки з вагою (розрахунок за 100г/мл)</span>
+        </label>
+        <label class="filter-check-row">
+          <input type="checkbox" id="chkOnlyInStock" onchange="toggleOnlyInStockFilter(this.checked)" checked/>
+          <span>✅ Тільки в наявності</span>
+        </label>
+      </div>
+
+      <!-- Підсумок результатів -->
+      <div class="filter-footer-summary">
+        <span id="filterResultsCountLbl">Всі товари активні</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. СЦЕНА 1: 3D COVER-FLOW КАРТОК -->
+<div class="stage-container" id="stageContainer">
+  <button class="stage-nav-btn stage-nav-prev" onclick="rotateRight()" title="Попередній товар">‹</button>
+  <div class="cards-stage" id="cardsStage"></div>
+  <button class="stage-nav-btn stage-nav-next" onclick="rotateLeft()" title="Наступний товар">›</button>
+  <div class="stage-counter" id="stageCounter">Завантаження товарів...</div>
+</div>
+
+<!-- 6. СЦЕНА 2: ПРЯМЕ ПОРІВНЯННЯ «ТОВАР В ТОВАР» ТА СІТКА -->
+<div class="dual-view-container" id="dualViewContainer" style="display: none;">
+  <div class="dual-view-header">
+    <h3>⚡ Пряме порівняння цін «Товар в товар»</h3>
+    <p>Система автоматично з'єднує однакові позиції з АТБ та Сільпо з урахуванням суворого вето брендів (Lay's ≠ Chipsters) та різниці у вазі.</p>
+  </div>
+  <div class="dual-table-body" id="dualTableBody"></div>
+</div>
+
+<!-- Звичайна сітка (альтернативний вигляд для великого каталогу) -->
+<div class="products-grid" id="productsGrid" style="display: none;"></div>
+
+<!-- ═══════════════════════════════════════════
+   ВИСУВНА ПАНЕЛЬ КОШИКА (SLIDE-IN CART PANEL)
+═══════════════════════════════════════════ -->
+<div class="cart-panel" id="cartPanel">
+  <div class="cart-content">
+    <div class="cart-header">
+      <div class="cart-title">
+        <i class="fa-solid fa-basket-shopping" style="color:var(--primary);"></i>
+        Розумний Спліт-Кошик
+      </div>
+      <button class="cart-close-btn" onclick="closeCartPanel()">✕</button>
+    </div>
+
+    <!-- Спліт калькулятор економії -->
+    <div class="cart-split-banner">
+      <div class="cart-split-chips">
+        <div class="cart-split-chip atb">
+          <span>🔴 Купити в АТБ</span>
+          <span id="cartAtbSum" style="font-size:14px; font-weight:800;">0.00 ₴</span>
+        </div>
+        <div class="cart-split-chip silpo">
+          <span>🟠 Купити в Сільпо</span>
+          <span id="cartSilpoSum" style="font-size:14px; font-weight:800;">0.00 ₴</span>
+        </div>
+      </div>
+      <div class="cart-saving-pill" id="cartSavingPill" style="display:none;">
+        💚 Економія завдяки спліту: 0.00 ₴
+      </div>
+    </div>
+
+    <!-- Список товарів у кошику -->
+    <div class="cart-items" id="cartItems">
+      <div class="cart-empty">
+        <div style="font-size:38px;">🛍️</div>
+        <div>Кошик порожній</div>
+        <div style="font-size:12px; color:var(--text3);">Додайте товари зі сцени або порівняння</div>
+      </div>
+    </div>
+
+    <!-- Футер кошика -->
+    <div class="cart-footer" id="cartFooter" style="display: none;">
+      <div class="cart-total">
+        <span>Разом до сплати:</span>
+        <span id="cartTotalPrice" style="color:var(--primary);">0.00 ₴</span>
+      </div>
+      <button class="cart-checkout" onclick="alert('Список покупок сформовано! Ви можете придбати товари зі знижкою в обраних магазинах.')">
+        Оформити замовлення
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+   ВИСУВНА ПАНЕЛЬ ОПЦІЙ / АДМІН (ADMIN PANEL)
+═══════════════════════════════════════════ -->
+<div class="admin-panel" id="adminPanel">
+  <div class="admin-panel-content">
+    <div class="admin-panel-header">
+      <div class="admin-panel-title">
+        <i class="fa-solid fa-gear" style="color:var(--primary);"></i>
+        Налаштування & Опції
+      </div>
+      <button class="admin-close-btn" onclick="closeAdminPanel()">✕</button>
+    </div>
+
+    <div class="admin-panel-body">
+      <!-- 1. Фільтр магазину -->
+      <div class="admin-group">
+        <div class="admin-group-label">Вибір мережі магазинів</div>
+        <div style="display:flex; gap:8px;">
+          <button class="pill-btn active" id="storePillAll" style="flex:1; justify-content:center;" onclick="setStoreFilter('all')">🛍️ Всі</button>
+          <button class="pill-btn pill-atb" id="storePillAtb" style="flex:1; justify-content:center;" onclick="setStoreFilter('atb')">🔴 АТБ</button>
+          <button class="pill-btn pill-silpo" id="storePillSilpo" style="flex:1; justify-content:center;" onclick="setStoreFilter('silpo')">🟠 Сільпо</button>
+        </div>
+      </div>
+
+      <!-- 2. Режим перегляду -->
+      <div class="admin-group">
+        <div class="admin-group-label">Режим відображення сторінки</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="admin-option-btn" onclick="switchViewMode('3d'); closeAdminPanel();">
+            <i class="fa-solid fa-cube" style="color:var(--primary); font-size:16px;"></i>
+            <span>3D Cover-Flow карусель</span>
+          </div>
+          <div class="admin-option-btn" onclick="switchViewMode('grid'); closeAdminPanel();">
+            <i class="fa-solid fa-table-cells" style="color:var(--primary); font-size:16px;"></i>
+            <span>▦ Звичайний каталог (Сітка)</span>
+          </div>
+          <div class="admin-option-btn" onclick="switchViewMode('dual'); closeAdminPanel();">
+            <i class="fa-solid fa-bolt" style="color:#2563eb; font-size:16px;"></i>
+            <span>⚡ Пряме порівняння «Товар в товар»</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.1. ЗВУКОВИЙ ПРОФІЛЬ ТА ГУЧНІСТЬ -->
+      <div class="admin-group">
+        <div class="admin-group-label" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>🔊 Звук скролу (Web Audio)</span>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="chkSoundEnabled" checked onchange="toggleSoundEnabled(this.checked)"/>
+            <span>Увімк.</span>
+          </label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:6px;">
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text3); margin-bottom:4px;">Профіль звуку (50 варіантів)</div>
+            <select id="soundPresetSelect" class="admin-select" onchange="onSoundPresetChange(this.value)">
+              <optgroup label="⚙️ 1. Механіка та прилади">
+                <option value="mechanical" selected>1. Механічний Detent (Default)</option>
+                <option value="leica">2. Leica Camera Dial</option>
+                <option value="ratchet">3. Важка сталева тріскачка</option>
+                <option value="swiss_watch">4. Швейцарський годинник</option>
+                <option value="tourbillon">5. Турбійон Escapement</option>
+                <option value="safe_lock">6. Сейфовий замок</option>
+                <option value="odometer">7. Ретро-одометр</option>
+                <option value="cassette">8. Лічильник касетника</option>
+                <option value="vintage_radio">9. Радіоручка 70-х</option>
+                <option value="industrial_switch">10. Промисловий тумблер</option>
+                <option value="micrometer">11. Мікрометр (0.01 мм)</option>
+                <option value="torque_wrench">12. Динамометричний ключ</option>
+                <option value="stapler">13. Степлер / Затискач</option>
+                <option value="bolt_action">14. Затвор рушниці</option>
+                <option value="egg_timer">15. Пружинний таймер</option>
+              </optgroup>
+              <optgroup label="💾 2. Ретро-техніка та ПК">
+                <option value="clickwheel">16. iPod Click Wheel</option>
+                <option value="rotary_phone">17. Дисковий телефон</option>
+                <option value="ibm_model_m">18. IBM Model M (Buckling)</option>
+                <option value="cherry_blue">19. Cherry MX Blue (Click)</option>
+                <option value="cherry_brown">20. Cherry MX Brown (Tactile)</option>
+                <option value="relay_click">21. Електромагнітне реле</option>
+                <option value="floppy_seek">22. Дисковод 3.5" Floppy</option>
+                <option value="hdd_stepper">23. Жорсткий диск HDD</option>
+                <option value="dot_matrix">24. Матричний принтер</option>
+                <option value="vt100">25. Термінал DEC VT100</option>
+                <option value="geiger">26. Лічильник Гейгера</option>
+                <option value="telegraph">27. Телеграф Морзе</option>
+              </optgroup>
+              <optgroup label="🎵 3. Музичні та перкусійні">
+                <option value="woodblock">28. Дерев'яний кастаньєт</option>
+                <option value="marimba">29. Маримба / Ксилофон</option>
+                <option value="triangle">30. Металевий трикутник</option>
+                <option value="snap">31. Клацання пальцями</option>
+                <option value="metronome">32. Метроном (Тик-так)</option>
+                <option value="hihat">33. Закритий Hi-Hat</option>
+                <option value="crystal">34. Кришталевий бокал</option>
+                <option value="bell">35. Дзвіночок рецепції</option>
+                <option value="bamboo">36. Бамбуковий перестук</option>
+                <option value="tone_440">37. Камертон 440 Гц</option>
+              </optgroup>
+              <optgroup label="🕹️ 4. Геймінг та Sci-Fi">
+                <option value="retro_8bit">38. 8-Bit Arcade Jump</option>
+                <option value="gameboy_coin">39. Game Boy Піп</option>
+                <option value="shield_charge">40. Силовий щит</option>
+                <option value="laser_encoder">41. Лазерний енкодер</option>
+                <option value="cyber_servo">42. Сервопривід кіборга</option>
+                <option value="warp_drive">43. Варп-диск корабля</option>
+                <option value="holo_ui">44. Голографічний інтерфейс</option>
+                <option value="mag_lock">45. Магнітний замок</option>
+                <option value="bio_scanner">46. Біо-сканер</option>
+              </optgroup>
+              <optgroup label="📳 5. Басові та тактильні">
+                <option value="sub_bass_60">47. Суб-бас удар (60 Гц)</option>
+                <option value="kick_detent">48. Акустичний Kick</option>
+                <option value="soft_rubber">49. М'яка гума (Damped)</option>
+                <option value="silent">50. Без звуку (Тільки вібрація)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:var(--text3); margin-bottom:4px;">
+              <span>Гучність ефектів</span>
+              <span id="soundVolumeLabel">75%</span>
+            </div>
+            <input type="range" id="soundVolumeRange" min="0" max="100" value="75" style="width:100%; accent-color:var(--primary);" oninput="onSoundVolumeChange(this.value)"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.2. ТАКТИЛЬНА ВІБРАЦІЯ (HAPTICS) -->
+      <div class="admin-group">
+        <div class="admin-group-label" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>📳 Тактильна вібрація (Haptics)</span>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="chkHapticEnabled" checked onchange="toggleHapticEnabled(this.checked)"/>
+            <span>Увімк.</span>
+          </label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:6px;">
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text3); margin-bottom:4px;">Сила вібрації</div>
+            <select id="hapticStrengthSelect" class="admin-select" onchange="onHapticStrengthChange(this.value)">
+              <option value="light">Легка (М'який дотик)</option>
+              <option value="medium" selected>Середня (Стандартний клік)</option>
+              <option value="strong">Сильна (Потужний відгук)</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text3); margin-bottom:4px;">Вид тактильного відгуку</div>
+            <select id="hapticTypeSelect" class="admin-select" onchange="onHapticTypeChange(this.value)">
+              <option value="hybrid" selected>Гібридний (Taptic Engine + Акустика корпусу)</option>
+              <option value="taptic">Taptic Engine (iOS Safari Switch)</option>
+              <option value="acoustic">Акустичний резонанс динаміка</option>
+              <option value="webapi">Web Vibration API (Android / Polyfill)</option>
+            </select>
+          </div>
+          <button class="pill-btn" type="button" style="width:100%; justify-content:center; background:#f8fafc; border:1px solid #cbd5e1; font-size:12px; font-weight:700; cursor:pointer; padding:8px 12px; border-radius:10px;" onclick="testHapticFeedback()">
+            📳 Тест вібрації (Клацнути)
+          </button>
+        </div>
+      </div>
+
+      <!-- 2.3. СИЛА ПРОКРУТУ ТА ІНЕРЦІЯ -->
+      <div class="admin-group">
+        <div class="admin-group-label">⚡ Сила прокруту та інерція свайпу</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <select id="swipeSensitivitySelect" class="admin-select" onchange="onSwipeSensitivityChange(this.value)">
+            <option value="soft">М'яка (1 картка за свайп)</option>
+            <option value="normal" selected>Стандартна (1-3 картки з інерцією)</option>
+            <option value="strong">Потужна (2-4 картки з довгим ковзанням)</option>
+            <option value="turbo">Турбо (Вільний швидкий політ)</option>
+          </select>
+          <div style="font-size:11px; color:var(--text3);">Визначає, скільки карток прокручується по інерції залежно від швидкості вашого руху.</div>
+        </div>
+      </div>
+
+      <!-- 3. Сервіси та інструменти -->
+      <div class="admin-group">
+        <div class="admin-group-label">Сервіси та інструменти</div>
+        <div class="admin-option-btn" onclick="openCrazyDealsModal(); closeAdminPanel();">
+          <i class="fa-solid fa-fire" style="color:#ea580c; font-size:16px;"></i>
+          <span>🔥 Шалені знижки АТБ & Сільпо</span>
+        </div>
+        <div class="admin-option-btn" onclick="openBarcodeModal(); closeAdminPanel();">
+          <i class="fa-solid fa-barcode" style="color:#7c3aed; font-size:16px;"></i>
+          <span>📷 Сканер штрихкодів (EAN-13)</span>
+        </div>
+        <div class="admin-option-btn" onclick="openReceiptModal(); closeAdminPanel();">
+          <i class="fa-solid fa-receipt" style="color:#2563eb; font-size:16px;"></i>
+          <span>🧾 ШІ-аналізатор чеків (Gemini)</span>
+        </div>
+        <div class="admin-option-btn" onclick="openWishlistModal(); closeAdminPanel();">
+          <i class="fa-solid fa-heart" style="color:#e11d48; font-size:16px;"></i>
+          <span>⭐ Список бажаного (<span id="wishlistCountBadge">0</span>)</span>
+        </div>
+      </div>
+
+      <!-- 4. Магазин Сільпо (Місто / Адреса) -->
+      <div class="admin-group">
+        <div class="admin-group-label">Супермаркет Сільпо (Місто / Адреса)</div>
+        <select id="branchSelect" class="admin-select" onchange="onBranchChange(this.value)">
+          <option value="">Завантаження міст...</option>
+        </select>
+      </div>
+
+      <!-- 5. Сільпо MCP Профіль -->
+      <div class="admin-group">
+        <div class="admin-group-label">AI Factory MCP</div>
+        <div class="admin-option-btn" onclick="openMcpModal()">
+          <i class="fa-solid fa-bolt" style="color:var(--silpo-orange); font-size:16px;"></i>
+          <span>Сільпо MCP Профіль</span>
+          <span class="status-dot" id="mcpDot" style="margin-left:auto; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
+        </div>
+      </div>
+
+      <!-- 4. Кешбеки та карти -->
+      <div class="admin-group">
+        <div class="admin-group-label">Знижки банківських карт</div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer;">
+          <input type="checkbox" id="chkAtbCard" checked/>
+          <span>Картка АТБ (Mono / А-Банк) -5%</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer;">
+          <input type="checkbox" id="chkSilpoCard" checked/>
+          <span>«Власний Рахунок» Сільпо</span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+   МОДАЛЬНІ ВІКНА
+═══════════════════════════════════════════ -->
+
+<!-- 1. МОДАЛЬНЕ ВІКНО СКАНЕРА ШТРИХКОДІВ -->
+<div class="modal" id="barcodeModal">
+  <div class="modal-content">
+    <div class="modal-header-row">
+      <div class="modal-title">
+        <i class="fa-solid fa-barcode" style="color:#7c3aed;"></i>
+        Сканер штрихкодів (EAN-13)
+      </div>
+      <button class="modal-close-icon" onclick="closeBarcodeModal()">✕</button>
+    </div>
+
+    <!-- Вікно камери -->
+    <div id="barcodeReader" style="width: 100%; border-radius: 16px; overflow: hidden; background: #000; min-height: 240px; margin-bottom: 14px;"></div>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+      <input type="text" id="barcodeInput" placeholder="Або введіть штрихкод (напр. 4820003480113)..." class="admin-select" style="flex:1;"/>
+      <button class="admin-btn" onclick="lookupBarcodeManual()">Знайти</button>
+    </div>
+
+    <div id="barcodeResult" style="display:none; padding:14px; background:#f8fafc; border-radius:14px; border:1px solid var(--border);"></div>
+  </div>
+</div>
+
+<!-- 2. МОДАЛЬНЕ ВІКНО РОЗПІЗНАВАННЯ ЧЕКІВ (GEMINI VISION) -->
+<div class="modal" id="receiptModal">
+  <div class="modal-content">
+    <div class="modal-header-row">
+      <div class="modal-title">
+        <i class="fa-solid fa-receipt" style="color:#2563eb;"></i>
+        ШІ-аналізатор чеків
+      </div>
+      <button class="modal-close-icon" onclick="closeReceiptModal()">✕</button>
+    </div>
+
+    <div style="font-size:13px; color:var(--text2); margin-bottom:16px;">
+      Сфотографуйте чек або завантажте фото з галереї. Google Gemini Vision автоматично виділить товари та перевірить ціни в АТБ і Сільпо.
+    </div>
+
+    <label style="display:flex; align-items:center; justify-content:center; gap:8px; background:var(--primary); color:#fff; padding:12px; border-radius:14px; font-weight:700; cursor:pointer; margin-bottom:14px;">
+      <i class="fa-solid fa-camera"></i>
+      <span>📸 Сфотографувати або вибрати чек</span>
+      <input type="file" id="receiptFileInput" accept="image/*" style="display:none;" onchange="handleReceiptUpload(event)"/>
+    </label>
+
+    <div id="receiptLoading" style="display:none; text-align:center; padding:20px;">
+      <div class="search-spinner" style="display:inline-block; width:28px; height:28px; border-width:3px;"></div>
+      <div style="margin-top:8px; font-weight:700; font-size:14px;">ШІ аналізує чек та порівнює ціни...</div>
+    </div>
+
+    <div id="receiptResults" style="display:none; max-height:360px; overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- 3. МОДАЛЬНЕ ВІКНО ШАЛЕНИХ ЗНИЖОК -->
+<div class="modal" id="crazyDealsModal">
+  <div class="modal-content" style="max-width:680px;">
+    <div class="modal-header-row">
+      <div class="modal-title">
+        <i class="fa-solid fa-fire" style="color:#ea580c;"></i>
+        🔥 Шалені знижки (40% - 60%)
+      </div>
+      <button class="modal-close-icon" onclick="closeCrazyDealsModal()">✕</button>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button class="pill-btn active" id="dealTabAll" onclick="filterDeals('all')">Всі знижки</button>
+      <button class="pill-btn pill-atb" id="dealTabAtb" onclick="filterDeals('atb')">🔴 Акції АТБ</button>
+      <button class="pill-btn pill-silpo" id="dealTabSilpo" onclick="filterDeals('silpo')">🟠 Цінотижики Сільпо</button>
+    </div>
+
+    <div id="crazyDealsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; max-height:450px; overflow-y:auto;">
+      <div style="text-align:center; padding:30px; grid-column:1/-1;">Завантаження акцій...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. МОДАЛЬНЕ ВІКНО СПИСКУ БАЖАНОГО -->
+<div class="modal" id="wishlistModal">
+  <div class="modal-content">
+    <div class="modal-header-row">
+      <div class="modal-title">
+        <i class="fa-solid fa-heart" style="color:#e11d48;"></i>
+        ⭐ Список бажаного
+      </div>
+      <button class="modal-close-icon" onclick="closeWishlistModal()">✕</button>
+    </div>
+
+    <div id="wishlistContainer" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;">
+      <div style="text-align:center; padding:30px; color:var(--text3);">Список бажаного порожній</div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. МОДАЛЬНЕ ВІКНО ВИБОРУ МАГАЗИНУ (ПОРІВНЯННЯ ТОВАР В ТОВАР) -->
+<div class="modal" id="dualChoiceModal">
+  <div class="modal-content" style="max-width:440px;">
+    <div class="modal-header-row">
+      <div class="modal-title">
+        <span>Перейти до магазину</span>
+      </div>
+      <button class="modal-close-icon" onclick="closeDualChoiceModal()">✕</button>
+    </div>
+    <div id="dualChoiceBody" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </div>
+</div>
+
+<!-- 6. МОДАЛЬНЕ ВІКНО SILPO MCP AI FACTORY -->
+<div class="modal" id="mcpModal">
+  <div class="modal-content">
+    <div class="modal-header-row">
+      <div class="modal-title">
+        <i class="fa-solid fa-bolt" style="color:var(--silpo-orange);"></i>
+        Silpo AI Factory MCP
+      </div>
+      <button class="modal-close-icon" onclick="closeMcpModal()">✕</button>
+    </div>
+
+    <div style="font-size:13px; color:var(--text2); line-height:1.5; margin-bottom:16px;">
+      Офіційний протокол Model Context Protocol (MCP) Сільпо інтегровано! Він синхронізує персональні купони, історію покупок та бонусний баланс «Власний Рахунок».
+    </div>
+
+    <div id="mcpStatusCard" style="background:#f8fafc; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:14px;">
+      <div style="font-weight:700; font-size:13px; margin-bottom:4px;">Статус: <span id="mcpStatusText" style="color:#10b981;">Підключено</span></div>
+      <div id="mcpGuestInfo" style="font-size:12px; color:var(--text2);">Профіль гостя завантажується...</div>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="admin-btn" style="flex:1;" onclick="syncMcpProfile()">Оновити бонуси</button>
+      <button class="pill-btn" onclick="closeMcpModal()">Закрити</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js?v=2.8"></script>
+</body>
+</html>
