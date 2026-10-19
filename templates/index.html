@@ -69,9 +69,14 @@
       <div class="search-spinner" id="searchSpinner"></div>
     </div>
     
+    <!-- 0. Кнопка Каталог категорій -->
+    <button class="round-action-btn" id="categoriesRoundBtn" onclick="toggleCategoriesMenu(event)" title="Каталог категорій (напої, солодощі, м'ясо...)">
+      <i class="fa-solid fa-shapes"></i>
+    </button>
+
     <!-- 1. Кнопка зміни режиму перегляду -->
-    <button class="round-action-btn view-toggle-round" id="viewToggleRoundBtn" onclick="cycleViewMode()" title="Змінити вигляд (3D / Сітка / VS)">
-      <i class="fa-solid fa-cube" id="viewToggleRoundIcon"></i>
+    <button class="round-action-btn view-toggle-round" id="viewToggleRoundBtn" onclick="cycleViewMode()" title="Змінити вигляд (Сітка / 3D / VS)">
+      <i class="fa-solid fa-table-cells" id="viewToggleRoundIcon"></i>
     </button>
 
     <!-- 2. Кнопка Фільтр -->
@@ -83,6 +88,175 @@
     <button class="round-action-btn" id="sortRoundBtn" onclick="toggleSortMenu(event)" title="Сортування товарів">
       <i class="fa-solid fa-arrow-down-wide-short"></i>
     </button>
+  </div>
+
+  <!-- Швидка плашка активної категорії з підкатегоріями -->
+  <div class="smart-category-active-bar" id="smartCategoryActiveBar" style="display: none;">
+    <div class="smart-category-title-area">
+      <span class="smart-cat-icon" id="smartCatIcon">🥤</span>
+      <span class="smart-cat-name" id="smartCatName">Напої</span>
+      <button class="smart-cat-close-btn" onclick="clearSmartCategory()" title="Скинути категорію">✕</button>
+    </div>
+    <div class="smart-category-pills" id="smartCategoryPills"></div>
+  </div>
+
+  <!-- Випадаюче меню категорій -->
+  <div class="search-dropdown-menu categories-dropdown-menu" id="categoriesDropdown" style="display: none;">
+    <div class="dropdown-header-row">
+      <div class="dropdown-title">🗂️ Каталог категорій</div>
+      <span class="dropdown-active-badge" id="catActiveBadge">Всі товари</span>
+    </div>
+    <div class="categories-grid-container">
+      <!-- 1. Напої -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('напої')">
+          <span class="cat-icon">🥤</span>
+          <span class="cat-title">Напої (соки, води, енергетики)</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('сік')">🧃 Соки та нектари</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('енергетик')">⚡ Енергетики</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('кола')">🥤 Кола & Лимонади</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('вода')">💧 Мінеральна вода</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('квас')">🍃 Квас & Холодний чай</button>
+        </div>
+      </div>
+
+      <!-- 2. Молочка -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('молочка')">
+          <span class="cat-icon">🥛</span>
+          <span class="cat-title">Молочні продукти</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('молоко')">Молоко</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('сир')">Сири тверді & м'які</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('йогурт')">Йогурти</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('сметана')">Сметана</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('масло')">Масло вершкове</button>
+        </div>
+      </div>
+
+      <!-- 3. М'ясо та ковбаси -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('м\'ясо')">
+          <span class="cat-icon">🥩</span>
+          <span class="cat-title">М'ясо, птиця та ковбаси</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('курка')">Курятина & філе</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('свинина')">Свинина & яловичина</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('ковбаса')">Ковбаси</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('сосиски')">Сосиски & сардельки</button>
+        </div>
+      </div>
+
+      <!-- 4. Солодощі та десерти -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('солодощі')">
+          <span class="cat-icon">🍫</span>
+          <span class="cat-title">Солодощі та десерти</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('шоколад')">Шоколад</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('печиво')">Печиво & вафлі</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('цукерки')">Цукерки</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('торт')">Торти & тістечка</button>
+        </div>
+      </div>
+
+      <!-- 5. Снеки та чипси -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('снеки')">
+          <span class="cat-icon">🥔</span>
+          <span class="cat-title">Снеки та чипси</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('чипси')">Чипси (Lay's, Chipsters)</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('сухарики')">Сухарики & грінки</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('горішки')">Горішки & арахіс</button>
+        </div>
+      </div>
+
+      <!-- 6. Риба та морепродукти -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('риба')">
+          <span class="cat-icon">🐟</span>
+          <span class="cat-title">Риба та морепродукти</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('лосось')">Червона риба</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('оселедець')">Оселедець & скумбрія</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('креветки')">Креветки & мідії</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('ікра')">Ікра</button>
+        </div>
+      </div>
+
+      <!-- 7. Овочі та фрукти -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('фрукти')">
+          <span class="cat-icon">🍎</span>
+          <span class="cat-title">Овочі, фрукти та зелень</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('яблука')">Свіжі яблука & цитрусові</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('банани')">Банани</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('помідори')">Томати & огірки</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('картопля')">Картопля & коренеплоди</button>
+        </div>
+      </div>
+
+      <!-- 8. Бакалія та крупи -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('бакалія')">
+          <span class="cat-icon">🌾</span>
+          <span class="cat-title">Бакалія, крупи та олія</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('макарони')">Макарони & паста</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('гречка')">Гречка & рис</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('олія')">Соняшникова олія</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('борошно')">Борошно & цукор</button>
+        </div>
+      </div>
+
+      <!-- 9. Кава та чай -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('кава')">
+          <span class="cat-icon">☕</span>
+          <span class="cat-title">Кава та чай</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('кава в зернах')">Кава в зернах</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('кава розчинна')">Кава розчинна</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('чай')">Чай чорний & зелений</button>
+        </div>
+      </div>
+
+      <!-- 10. Побутова хімія -->
+      <div class="category-block">
+        <div class="category-block-header" onclick="quickSearchCategory('хімія')">
+          <span class="cat-icon">🧼</span>
+          <span class="cat-title">Побутова хімія & гігієна</span>
+          <i class="fa-solid fa-chevron-right cat-arrow"></i>
+        </div>
+        <div class="category-sub-pills">
+          <button class="cat-sub-btn" onclick="quickSearchCategory('порошок')">Пральні порошки & гелі</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('миючий засіб')">Для миття посуду</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('мило')">Мило & шампуні</button>
+          <button class="cat-sub-btn" onclick="quickSearchCategory('туалетний папір')">Папір & серветки</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Випадаюче меню сортування -->
@@ -197,6 +371,11 @@
           <input type="checkbox" id="chkOnlyInStock" onchange="toggleOnlyInStockFilter(this.checked)" checked/>
           <span>✅ Тільки в наявності</span>
         </label>
+        <label class="filter-check-row">
+          <input type="checkbox" id="showNovaPoshta" onchange="toggleNovaPoshta()"/>
+          <span>📦 Показувати доставку Новою Поштою</span>
+        </label>
+
       </div>
 
       <!-- Підсумок результатів -->
@@ -207,12 +386,27 @@
   </div>
 </div>
 
+<!-- 4.5. ПАНЕЛЬ ЛІЧИЛЬНИКА ЗНАЙДЕНИХ ТОВАРІВ (ВКЛАДКИ ТІЛЬКИ ВНИЗУ) -->
+<div class="catalog-tabs-wrapper" id="catalogTabsWrapper">
+  <div class="catalog-header-stats">
+    <div class="catalog-found-chip" id="catalogFoundChip">
+      <i class="fa-solid fa-boxes-stacked"></i>
+      <span id="catalogFoundText">Знайдено: <strong>0</strong> товарів</span>
+    </div>
+    <div class="catalog-loading-badge" id="catalogLoadingBadge" style="display: none;">
+      <span class="loading-spin-dot"></span>
+      <span id="catalogLoadingText">Підтягуються інші товари...</span>
+    </div>
+  </div>
+</div>
+
 <!-- 5. СЦЕНА 1: 3D COVER-FLOW КАРТОК -->
-<div class="stage-container" id="stageContainer">
+<div class="stage-container" id="stageContainer" style="display: none;">
   <button class="stage-nav-btn stage-nav-prev" onclick="rotateRight()" title="Попередній товар">‹</button>
   <div class="cards-stage" id="cardsStage"></div>
   <button class="stage-nav-btn stage-nav-next" onclick="rotateLeft()" title="Наступний товар">›</button>
   <div class="stage-counter" id="stageCounter">Завантаження товарів...</div>
+  <div class="catalog-bottom-pagination" id="stageBottomPagination" style="margin-top:20px; width:100%; max-width:800px;"></div>
 </div>
 
 <!-- 6. СЦЕНА 2: ПРЯМЕ ПОРІВНЯННЯ «ТОВАР В ТОВАР» ТА СІТКА -->
@@ -224,8 +418,8 @@
   <div class="dual-table-body" id="dualTableBody"></div>
 </div>
 
-<!-- Звичайна сітка (альтернативний вигляд для великого каталогу) -->
-<div class="products-grid" id="productsGrid" style="display: none;"></div>
+<!-- Звичайна сітка (класичний пошук за замовчуванням) -->
+<div class="products-grid" id="productsGrid"></div>
 
 <!-- ═══════════════════════════════════════════
    ВИСУВНА ПАНЕЛЬ КОШИКА (SLIDE-IN CART PANEL)

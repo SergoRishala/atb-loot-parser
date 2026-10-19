@@ -336,42 +336,52 @@ def get_product_details(
     return normalized
 
 
-def get_silpo_promotions(branch_id: str = DEFAULT_BRANCH_ID, limit: int = 60, timeout: int = 15) -> List[Dict[str, Any]]:
+def get_silpo_promotions(branch_id: str = DEFAULT_BRANCH_ID, limit: int = 50, offset: int = 0, timeout: int = 15) -> List[Dict[str, Any]]:
     """
-    Отримує актуальні акційні товари Сільпо:
-    «Цінотижики», «Цінодіджики», «Знижконики» та «Акції власного імпорту».
+    Отримує сторінку актуальних акційних товарів Сільпо:
+    «Цінотижики», «Цінодіджики», «Знижконики», «Акції власного імпорту», «Гуртом дешевше», «Гарбузики» та всі інші акції.
     """
-    url = f"{ECOM_BASE}/v1/uk/branches/{branch_id}/products?limit={limit}&mustHavePromotion=true&sortBy=popularity&sortDirection=desc"
+    url = f"{ECOM_BASE}/v1/uk/branches/{branch_id}/products?limit={limit}&mustHavePromotion=true&sortBy=popularity&sortDirection=desc&offset={offset}"
     req = urllib.request.Request(url, headers=DEFAULT_HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             items = data.get("items", [])
             normalized = []
-            target_ids = {"cinotyzhyky", "cinodidjiky", "znyzhkonyky", "akciyi-vlasnogo-importu"}
+            promo_name_map = {
+                "cinotyzhyky": "Цінотижики",
+                "cinodidjiky": "Цінодіджики",
+                "znyzhkonyky": "Знижконики",
+                "akciyi-vlasnogo-importu": "Власний імпорт",
+                "vlasny-import": "Власний імпорт",
+                "melkoopt": "Гуртом дешевше",
+                "harbuzyky": "Гарбузики",
+                "only_online": "Тільки Онлайн",
+                "kupuy-zaoshchadzhuy": "Купуй та заощаджуй",
+                "pakunok-shkolyara": "Пакунок школяра",
+                "dobri-promo": "Добрі промо"
+            }
 
             for it in items:
                 p = normalize_product(it)
                 promos = it.get("promotions") or []
                 promo_ids = [pr.get("id") for pr in promos if isinstance(pr, dict)]
-                if "cinotyzhyky" in promo_ids:
-                    p["promo_name"] = "Цінотижики"
-                elif "cinodidjiky" in promo_ids:
-                    p["promo_name"] = "Цінодіджики"
-                elif "znyzhkonyky" in promo_ids:
-                    p["promo_name"] = "Знижконики"
-                elif "akciyi-vlasnogo-importu" in promo_ids:
-                    p["promo_name"] = "Власний імпорт"
-                
-                # Помічаємо прапорець пріоритету
-                p["is_target_promo"] = any(pid in target_ids for pid in promo_ids)
+                found_name = None
+                for pid in promo_ids:
+                    if pid in promo_name_map:
+                        found_name = promo_name_map[pid]
+                        break
+                if found_name:
+                    p["promo_name"] = found_name
+                elif not p.get("promo_name"):
+                    p["promo_name"] = "Акція"
+
+                p["is_target_promo"] = True
                 normalized.append(p)
 
-            # Сортуємо: спочатку товари з цільових акцій, потім за знижкою %
-            normalized.sort(key=lambda x: (0 if x.get("is_target_promo") else 1, -(x.get("discount_percent") or 0)))
             return normalized
     except Exception as e:
-        print(f"Помилка завантаження акцій Сільпо: {e}")
+        print(f"Помилка завантаження акцій Сільпо (offset {offset}): {e}")
         return []
 
 

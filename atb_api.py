@@ -208,30 +208,60 @@ def get_atb_details(url: str, timeout: int = 10) -> Dict[str, str]:
         return {}
 
 
-def get_atb_promos(pages=(1, 2, 3), include_loyalty: bool = True, timeout: int = 12) -> List[Dict[str, Any]]:
+# ══════════════════════════════════════════════════════════════════════════════
+#   ПОВНИЙ СПИСОК ВСІХ АКЦІЙНИХ СТОРІНОК АТБ:
+#   - Економія (1-4)
+#   - Товари зі знижкою / sale_tovari (1-19)
+#   - Знижки / znyzhky (1-17)
+#   - Програма лояльності / loyalty (1-17)
+#   - Власна торгова марка / vtm (1-15)
+# ══════════════════════════════════════════════════════════════════════════════
+ATB_PROMO_CONFIG = [
+    ("Економія", "https://www.atbmarket.com/promo/economy", 4),
+    ("Знижки", "https://www.atbmarket.com/promo/sale_tovari", 19),
+    ("Знижки", "https://www.atbmarket.com/promo/znyzhky", 17),
+    ("Лояльність", "https://www.atbmarket.com/promo/loyalty", 17),
+    ("Власна марка", "https://www.atbmarket.com/promo/vtm", 15),
+]
+
+ATB_ALL_PROMO_URLS = []
+for p_label, p_base, p_max in ATB_PROMO_CONFIG:
+    for page_num in range(1, p_max + 1):
+        target_url = p_base if page_num == 1 else f"{p_base}?page={page_num}"
+        ATB_ALL_PROMO_URLS.append((p_label, target_url))
+
+
+def get_atb_promos_page(page: int = 1, urls_per_batch: int = 2, timeout: int = 12) -> List[Dict[str, Any]]:
     """
-    Завантажує актуальні акційні товари АТБ з розділів «Економія» (сторінки 1-3)
-    та «Лояльність / Знижки» (https://www.atbmarket.com/promo/loyalty?sort=discount).
+    Завантажує конкретну порцію акцій АТБ із загального списку всіх акційних сторінок.
+    На кожну сторінку видачі бере 2 сторінки каталогу АТБ (~50-70 товарів).
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    urls = [
-        "https://www.atbmarket.com/promo/economy" if p == 1 else f"https://www.atbmarket.com/promo/economy?page={p}"
-        for p in pages
-    ]
-    if include_loyalty:
-        urls.append("https://www.atbmarket.com/promo/loyalty?sort=discount")
+    start_idx = (page - 1) * urls_per_batch
+    end_idx = start_idx + urls_per_batch
 
-    def _fetch(url):
+    if start_idx >= len(ATB_ALL_PROMO_URLS):
+        return []
+
+    batch_targets = ATB_ALL_PROMO_URLS[start_idx:end_idx]
+
+    def _fetch_target(item):
+        label, url = item
         try:
             req = urllib.request.Request(url, headers=HEADERS)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return parse_products_from_html(resp.read().decode("utf-8"))
-        except Exception:
+                prods = parse_products_from_html(resp.read().decode("utf-8"))
+                for p in prods:
+                    if not p.get("promo_name"):
+                        p["promo_name"] = label
+                return prods
+        except Exception as e:
+            print(f"Помилка завантаження АТБ {url}: {e}")
             return []
 
-    with ThreadPoolExecutor(max_workers=len(urls)) as executor:
-        results = list(executor.map(_fetch, urls))
+    with ThreadPoolExecutor(max_workers=len(batch_targets)) as executor:
+        results = list(executor.map(_fetch_target, batch_targets))
 
     combined = []
     seen = set()
@@ -243,3 +273,10 @@ def get_atb_promos(pages=(1, 2, 3), include_loyalty: bool = True, timeout: int =
                 combined.append(p)
 
     return combined
+
+
+def get_atb_promos(pages=(1, 2, 3), include_loyalty: bool = True, timeout: int = 12) -> List[Dict[str, Any]]:
+    """
+    Сумісність: завантажує перші сторінки акцій.
+    """
+    return get_atb_promos_page(page=1, urls_per_batch=2, timeout=timeout)

@@ -8,6 +8,11 @@ const API = '/api';
 // Стан застосунку
 let allProducts = [];
 let filteredProducts = [];
+let currentTab = 1;
+const ITEMS_PER_TAB = 100;
+let isBackgroundLoading = false;
+let currentSearchSeq = 0;
+let showNovaPoshta = false;
 let activeCategory = null; // Поточна обрана категорія
 let currentSearchQuery = ''; // За замовчуванням порожній запит (завантажуються акції Сільпо & АТБ)
 let currentSort = 'default'; // Сортування за замовчуванням
@@ -16,7 +21,7 @@ let filterDiscountMin = 0; // 0 = всі, 1 = будь-яка знижка, 20 =
 let filterPriceRange = 'all'; // 'all', '0-50', '50-100', '100-250', '250+'
 let filterOnlyWithWeight = false; // Тільки з вагою (ціна за 100г/мл)
 let filterOnlyInStock = true; // Тільки в наявності
-let currentViewMode = '3d'; // '3d', 'grid', 'dual'
+let currentViewMode = 'grid'; // '3d', 'grid', 'dual'
 let selectedBranchId = '1edb7351-d076-60fe-a545-51c4e9ef1e54'; // Дефолтне Сільпо (Київ)
 let cart = [];
 let wishlist = [];
@@ -536,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkMcpStatus();
   setupStageGestures();
   syncSettingsUI();
-  document.body.classList.add('mode-3d-locked');
+  switchViewMode('grid');
 
   // Початкове завантаження: гарячі акції Сільпо та АТБ
   performSearch('');
@@ -649,34 +654,191 @@ window.removeCategoryFilter = removeCategoryFilter;
 // ═══════════════════════════════════════════
 async function performSearch(query) {
   currentSearchQuery = query;
+  currentSearchSeq++;
+  const thisSeq = currentSearchSeq;
+
+  updateSmartCategoryBar(query);
+
   searchSpinner.style.display = 'block';
+  allProducts = [];
+  filteredProducts = [];
+  currentTab = 1;
+
+  updateCatalogCountDisplay(true, 0);
+  renderCurrentView();
 
   try {
     const qs = new URLSearchParams({
       q: query,
       store: currentStore,
       branch_id: selectedBranchId,
-      limit: 60
+      page: 1,
+      limit: 100,
+      sort: currentSort
     });
 
     const res = await fetch(`${API}/search?${qs.toString()}`);
     const data = await res.json();
 
-    if (data.success && Array.isArray(data.items)) {
+    if (thisSeq !== currentSearchSeq) return; // Відповідь застаріла
+
+    if (data.success && Array.isArray(data.items) && data.items.length > 0) {
       allProducts = data.items;
+      allProducts.forEach(p => {
+        p.is_nova_poshta = p.store === "silpo" && p.title && p.title.includes("Natural Garden норі");
+      });
       applyFiltersAndRender();
+
+      // Починаємо фоново підтягувати наступні вкладки (поки користувач дивиться вкладку 1)
+      startBackgroundLoading(query, thisSeq);
     } else {
       allProducts = [];
       applyFiltersAndRender();
+      updateCatalogCountDisplay(false, 0);
     }
   } catch (err) {
     console.error('Помилка пошуку:', err);
-    allProducts = [];
-    applyFiltersAndRender();
+    if (thisSeq === currentSearchSeq) {
+      allProducts = [];
+      applyFiltersAndRender();
+      updateCatalogCountDisplay(false, 0);
+    }
   } finally {
-    searchSpinner.style.display = 'none';
+    if (thisSeq === currentSearchSeq) {
+      searchSpinner.style.display = 'none';
+    }
   }
 }
+
+async function startBackgroundLoading(query, seq) {
+  isBackgroundLoading = true;
+  updateLoadingBadge(true, "Підтягуються інші товари...");
+
+  let page = 2;
+  const maxPages = 15; // До 1500 товарів
+
+  while (page <= maxPages && currentSearchSeq === seq) {
+    try {
+      const qs = new URLSearchParams({
+        q: query,
+        store: currentStore,
+        branch_id: selectedBranchId,
+        page: page,
+        limit: 100,
+        sort: currentSort
+      });
+
+      const res = await fetch(`${API}/search?${qs.toString()}`);
+      if (currentSearchSeq !== seq) break;
+
+      const data = await res.json();
+      if (!data.success || !data.items || data.items.length === 0) {
+        break;
+      }
+
+      data.items.forEach(p => {
+        p.is_nova_poshta = p.store === "silpo" && p.title && p.title.includes("Natural Garden норі");
+      });
+
+      // Перевіряємо унікальність нових товарів
+      const existingKeys = new Set(allProducts.map(p => (p.link || p.product_url || p.title)));
+      const newUnique = data.items.filter(p => !existingKeys.has(p.link || p.product_url || p.title));
+
+      if (newUnique.length > 0) {
+        allProducts.push(...newUnique);
+        // Оновлюємо вкладки та лічильник без збивання позиції користувача
+        applyFiltersAndRender_NoReset();
+      }
+
+      if (!data.has_more || data.items.length < 15) {
+        break;
+      }
+
+      page++;
+      // Коротка пауза між сторінками для економії ресурсів мережі та браузера
+      await new Promise(r => setTimeout(r, 200));
+    } catch (e) {
+      console.warn("Фонове завантаження завершилось:", e);
+      break;
+    }
+  }
+
+  if (currentSearchSeq === seq) {
+    isBackgroundLoading = false;
+    updateCatalogCountDisplay(false);
+    updateLoadingBadge(true, "✅ Всі товари завантажено");
+    setTimeout(() => {
+      if (!isBackgroundLoading && currentSearchSeq === seq) {
+        updateLoadingBadge(false);
+      }
+    }, 3500);
+  }
+}
+
+function updateCatalogCountDisplay(isLoading, count) {
+  const chipText = document.getElementById('catalogFoundText');
+  if (!chipText) return;
+  const total = count !== undefined ? count : (allProducts ? allProducts.length : 0);
+  const totalFiltered = filteredProducts ? filteredProducts.length : 0;
+  const totalTabs = Math.max(1, Math.ceil(totalFiltered / ITEMS_PER_TAB));
+
+  const atbCount = filteredProducts ? filteredProducts.filter(p => p.store === 'atb').length : 0;
+  const silpoCount = filteredProducts ? filteredProducts.filter(p => p.store === 'silpo').length : 0;
+
+  // Оновлюємо також цифри на кнопках фільтра магазину
+  const ftAll = document.getElementById('ftStoreAll');
+  const ftAtb = document.getElementById('ftStoreAtb');
+  const ftSilpo = document.getElementById('ftStoreSilpo');
+  const totalAtbAll = allProducts ? allProducts.filter(p => p.store === 'atb').length : 0;
+  const totalSilpoAll = allProducts ? allProducts.filter(p => p.store === 'silpo').length : 0;
+
+  if (ftAll) ftAll.textContent = `Всі (${allProducts.length})`;
+  if (ftAtb) ftAtb.textContent = `🔴 АТБ (${totalAtbAll})`;
+  if (ftSilpo) ftSilpo.textContent = `🟠 Сільпо (${totalSilpoAll})`;
+
+  if (isLoading && total === 0) {
+    chipText.innerHTML = `<span class="loading-spin-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;"></span> Завантаження товарів...`;
+  } else {
+    chipText.innerHTML = `
+      <span>Знайдено: <strong>${totalFiltered}</strong> товарів</span>
+      <span class="store-badge-stat store-badge-atb" title="Товарів з АТБ"><span class="store-dot-mini atb-dot"></span> АТБ: <b>${atbCount}</b></span>
+      <span class="store-badge-stat store-badge-silpo" title="Товарів із Сільпо"><span class="store-dot-mini silpo-dot"></span> Сільпо: <b>${silpoCount}</b></span>
+      <span class="tab-badge-stat">Вкладка <b>${currentTab}</b> з <b>${totalTabs}</b></span>
+    `;
+  }
+}
+
+function updateLoadingBadge(show, text) {
+  const badge = document.getElementById('catalogLoadingBadge');
+  const txt = document.getElementById('catalogLoadingText');
+  if (!badge) return;
+  if (show) {
+    badge.style.display = 'inline-flex';
+    if (txt && text) txt.textContent = text;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function selectCatalogTab(tabNum) {
+  if (tabNum < 1) return;
+  const totalTabs = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_TAB));
+  if (tabNum > totalTabs) return;
+
+  initAudio();
+  playTickSound(1);
+  triggerHaptics(1, true);
+
+  currentTab = tabNum;
+  updateCatalogCountDisplay();
+  renderCurrentView();
+
+  const searchBox = document.querySelector('.search-bar-row');
+  if (searchBox) {
+    searchBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+window.selectCatalogTab = selectCatalogTab;
 
 // ═══════════════════════════════════════════
 //   РОЗРАХУНОК НОРМАЛІЗОВАНОЇ ЦІНИ ТА ЕКОНОМІЇ
@@ -729,7 +891,140 @@ function getSavingAmount(p) {
   return 0;
 }
 
+function renderGridBottomPagination(totalTabs, totalItems) {
+  let bottomNav = productsGrid.querySelector('.catalog-bottom-pagination');
+  if (totalTabs <= 1) {
+    if (bottomNav) bottomNav.remove();
+    return;
+  }
+  if (!bottomNav) {
+    bottomNav = document.createElement('div');
+    bottomNav.className = 'catalog-bottom-pagination';
+    productsGrid.appendChild(bottomNav);
+  }
+
+  let tabsHtml = '';
+  for (let i = 1; i <= totalTabs; i++) {
+    const startNum = (i - 1) * ITEMS_PER_TAB + 1;
+    const endNum = Math.min(i * ITEMS_PER_TAB, totalItems);
+    const isActive = i === currentTab;
+    tabsHtml += `
+      <button class="catalog-tab-btn ${isActive ? 'active' : ''}" onclick="selectCatalogTab(${i})">
+        <span>Вкладка ${i}</span>
+        <span class="tab-badge-count">${startNum}–${endNum}</span>
+      </button>
+    `;
+  }
+
+  bottomNav.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+      <button class="catalog-page-btn" ${currentTab <= 1 ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab - 1})">
+        <i class="fa-solid fa-chevron-left"></i> Попередня вкладка
+      </button>
+      <span class="catalog-page-info">Вкладка <strong>${currentTab}</strong> з <strong>${totalTabs}</strong> (${totalItems} товарів)</span>
+      <button class="catalog-page-btn" ${currentTab >= totalTabs ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab + 1})">
+        Наступна вкладка <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+    <div class="catalog-tabs-list" style="justify-content:center; flex-wrap:wrap; width:100%; gap:8px;">
+      ${tabsHtml}
+    </div>
+  `;
+}
+
+function renderStageBottomPagination(totalTabs, totalItems) {
+  const stageNav = document.getElementById('stageBottomPagination');
+  if (!stageNav) return;
+  if (totalTabs <= 1) {
+    stageNav.style.display = 'none';
+    stageNav.innerHTML = '';
+    return;
+  }
+
+  let tabsHtml = '';
+  for (let i = 1; i <= totalTabs; i++) {
+    const startNum = (i - 1) * ITEMS_PER_TAB + 1;
+    const endNum = Math.min(i * ITEMS_PER_TAB, totalItems);
+    const isActive = i === currentTab;
+    tabsHtml += `
+      <button class="catalog-tab-btn ${isActive ? 'active' : ''}" onclick="selectCatalogTab(${i})">
+        <span>Вкладка ${i}</span>
+        <span class="tab-badge-count">${startNum}–${endNum}</span>
+      </button>
+    `;
+  }
+
+  stageNav.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+      <button class="catalog-page-btn" ${currentTab <= 1 ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab - 1})">
+        <i class="fa-solid fa-chevron-left"></i> Назад
+      </button>
+      <span class="catalog-page-info">Вкладка <strong>${currentTab}</strong> з <strong>${totalTabs}</strong> (${totalItems} товарів)</span>
+      <button class="catalog-page-btn" ${currentTab >= totalTabs ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab + 1})">
+        Вперед <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+    <div class="catalog-tabs-list" style="justify-content:center; flex-wrap:wrap; width:100%; gap:8px;">
+      ${tabsHtml}
+    </div>
+  `;
+  stageNav.style.display = 'flex';
+}
+
+function applyFiltersAndRender_NoReset() {
+  const savedTab = currentTab;
+  applyFiltersAndRender_Core();
+  const maxTabs = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_TAB));
+  currentTab = Math.min(savedTab, maxTabs);
+  updateCatalogCountDisplay();
+
+  const scrollY = window.scrollY;
+
+  // Якщо сортування активне і новий товар випередив інші (наприклад знижка 62% стала вище за 60%),
+  // виявляємо зміну порядку карток на поточній вкладці і оновлюємо сітку зі збереженням скролу!
+  if (currentViewMode === 'grid') {
+    const startIndex = (currentTab - 1) * ITEMS_PER_TAB;
+    const pageItems = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_TAB);
+    const existingCards = productsGrid.querySelectorAll('.grid-product-card');
+
+    let hasChanged = existingCards.length !== pageItems.length;
+    if (!hasChanged) {
+      for (let i = 0; i < pageItems.length; i++) {
+        const c = existingCards[i];
+        const p = pageItems[i];
+        const pKey = p.link || p.product_url || p.title;
+        if (c.dataset.productId !== pKey) {
+          hasChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (hasChanged) {
+      renderGrid();
+      window.scrollTo(0, scrollY);
+      return;
+    } else {
+      renderGridBottomPagination(maxTabs, filteredProducts.length);
+      return;
+    }
+  } else if (currentViewMode === '3d') {
+    renderStage();
+    return;
+  }
+
+  renderCurrentView();
+  window.scrollTo(0, scrollY);
+}
+
 function applyFiltersAndRender() {
+  currentTab = 1;
+  applyFiltersAndRender_Core();
+  updateCatalogCountDisplay();
+  renderCurrentView();
+}
+
+function applyFiltersAndRender_Core() {
   let filtered = [...allProducts];
 
   // 1. Фільтр за магазином
@@ -766,6 +1061,11 @@ function applyFiltersAndRender() {
   // 5. Тільки в наявності
   if (filterOnlyInStock) {
     filtered = filtered.filter(p => p.in_stock !== false);
+  }
+
+  // 5.1. Товари тільки для замовлення Новою Поштою
+  if (!showNovaPoshta) {
+    filtered = filtered.filter(p => !p.is_nova_poshta);
   }
 
   // 6. СОРТУВАННЯ
@@ -813,13 +1113,7 @@ function applyFiltersAndRender() {
     countLbl.textContent = `Показано: ${filtered.length} з ${allProducts.length} товарів`;
   }
 
-  if (currentViewMode === '3d') {
-    renderStage();
-  } else if (currentViewMode === 'grid') {
-    renderGrid();
-  } else if (currentViewMode === 'dual') {
-    renderDualView();
-  }
+
 }
 
 function setStoreFilter(store) {
@@ -952,8 +1246,191 @@ function resetAllFilters() {
 window.resetAllFilters = resetAllFilters;
 
 // ═══════════════════════════════════════════
-//   МЕНЮ СОРТУВАННЯ ТА ФІЛЬТРІВ
+//   МЕНЮ КАТЕГОРІЙ, СОРТУВАННЯ ТА ФІЛЬТРІВ
 // ═══════════════════════════════════════════
+const SMART_CATEGORY_METADATA = {
+  'напої': {
+    title: 'Напої',
+    icon: '🥤',
+    pills: [
+      { name: 'Всі напої', q: 'напої' },
+      { name: '🧃 Соки та нектари', q: 'сік' },
+      { name: '⚡ Енергетики', q: 'енергетик' },
+      { name: '🥤 Кола & Лимонад', q: 'кола' },
+      { name: '💧 Мінеральна вода', q: 'вода' },
+      { name: '🍃 Квас & Чай', q: 'квас' }
+    ]
+  },
+  'молочка': {
+    title: 'Молочні продукти',
+    icon: '🥛',
+    pills: [
+      { name: 'Вся молочка', q: 'молочка' },
+      { name: 'Молоко', q: 'молоко' },
+      { name: 'Сири тверді', q: 'сир' },
+      { name: 'Йогурти', q: 'йогурт' },
+      { name: 'Масло', q: 'масло' }
+    ]
+  },
+  'м\'ясо': {
+    title: 'М\'ясо та ковбаси',
+    icon: '🥩',
+    pills: [
+      { name: 'Все м\'ясо', q: 'м\'ясо' },
+      { name: 'Курятина', q: 'курка' },
+      { name: 'Свинина', q: 'свинина' },
+      { name: 'Ковбаса', q: 'ковбаса' },
+      { name: 'Сосиски', q: 'сосиски' }
+    ]
+  },
+  'солодощі': {
+    title: 'Солодощі та десерти',
+    icon: '🍫',
+    pills: [
+      { name: 'Всі солодощі', q: 'солодощі' },
+      { name: 'Шоколад', q: 'шоколад' },
+      { name: 'Печиво', q: 'печиво' },
+      { name: 'Цукерки', q: 'цукерки' }
+    ]
+  },
+  'снеки': {
+    title: 'Снеки та чипси',
+    icon: '🥔',
+    pills: [
+      { name: 'Всі снеки', q: 'снеки' },
+      { name: 'Чипси', q: 'чипси' },
+      { name: 'Сухарики', q: 'сухарики' },
+      { name: 'Горішки', q: 'горішки' }
+    ]
+  },
+  'риба': {
+    title: 'Риба та морепродукти',
+    icon: '🐟',
+    pills: [
+      { name: 'Вся риба', q: 'риба' },
+      { name: 'Лосось', q: 'лосось' },
+      { name: 'Оселедець', q: 'оселедець' },
+      { name: 'Креветки', q: 'креветки' }
+    ]
+  },
+  'фрукти': {
+    title: 'Овочі та фрукти',
+    icon: '🍎',
+    pills: [
+      { name: 'Всі фрукти & овочі', q: 'фрукти' },
+      { name: 'Яблука', q: 'яблука' },
+      { name: 'Банани', q: 'банани' },
+      { name: 'Овочі', q: 'овочі' }
+    ]
+  },
+  'бакалія': {
+    title: 'Бакалія та крупи',
+    icon: '🌾',
+    pills: [
+      { name: 'Вся бакалія', q: 'бакалія' },
+      { name: 'Макарони', q: 'макарони' },
+      { name: 'Гречка', q: 'гречка' },
+      { name: 'Олія', q: 'олія' }
+    ]
+  },
+  'кава': {
+    title: 'Кава та чай',
+    icon: '☕',
+    pills: [
+      { name: 'Вся кава & чай', q: 'кава' },
+      { name: 'В зернах', q: 'кава в зернах' },
+      { name: 'Розчинна', q: 'кава розчинна' },
+      { name: 'Чай', q: 'чай' }
+    ]
+  },
+  'хімія': {
+    title: 'Побутова хімія',
+    icon: '🧼',
+    pills: [
+      { name: 'Вся хімія', q: 'хімія' },
+      { name: 'Порошок', q: 'порошок' },
+      { name: 'Мило', q: 'мило' },
+      { name: 'Для посуду', q: 'миючий засіб' }
+    ]
+  }
+};
+
+function toggleCategoriesMenu(e) {
+  if (e) e.stopPropagation();
+  initAudio();
+  playTickSound(1);
+  triggerHaptics(1, true);
+
+  const catMenu = document.getElementById('categoriesDropdown');
+  const sortMenu = document.getElementById('sortDropdown');
+  const filterMenu = document.getElementById('filterDropdown');
+
+  if (sortMenu) sortMenu.style.display = 'none';
+  if (filterMenu) filterMenu.style.display = 'none';
+
+  const btn = document.getElementById('categoriesRoundBtn');
+  if (!catMenu) return;
+  const isHidden = catMenu.style.display === 'none';
+  catMenu.style.display = isHidden ? 'block' : 'none';
+  if (btn) btn.classList.toggle('active', isHidden);
+}
+window.toggleCategoriesMenu = toggleCategoriesMenu;
+
+function quickSearchCategory(catQuery) {
+  initAudio();
+  playTickSound(1);
+  triggerHaptics(1, true);
+
+  const menu = document.getElementById('categoriesDropdown');
+  if (menu) menu.style.display = 'none';
+  document.getElementById('categoriesRoundBtn')?.classList.remove('active');
+
+  searchInput.value = catQuery;
+  updateSmartCategoryBar(catQuery);
+  performSearch(catQuery);
+}
+window.quickSearchCategory = quickSearchCategory;
+
+function updateSmartCategoryBar(query) {
+  const bar = document.getElementById('smartCategoryActiveBar');
+  const iconEl = document.getElementById('smartCatIcon');
+  const nameEl = document.getElementById('smartCatName');
+  const pillsEl = document.getElementById('smartCategoryPills');
+  if (!bar || !pillsEl) return;
+
+  const q = (query || '').toLowerCase().trim();
+  let matchedMeta = null;
+
+  for (const [key, meta] of Object.entries(SMART_CATEGORY_METADATA)) {
+    if (q === key || meta.pills.some(p => p.q === q) || q.includes(key)) {
+      matchedMeta = meta;
+      break;
+    }
+  }
+
+  if (matchedMeta) {
+    iconEl.textContent = matchedMeta.icon;
+    nameEl.textContent = matchedMeta.title;
+    pillsEl.innerHTML = matchedMeta.pills.map(p => `
+      <button class="smart-sub-pill ${p.q === q ? 'active' : ''}" onclick="quickSearchCategory('${p.q}')">
+        ${p.name}
+      </button>
+    `).join('');
+    bar.style.display = 'flex';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+window.updateSmartCategoryBar = updateSmartCategoryBar;
+
+function clearSmartCategory() {
+  const bar = document.getElementById('smartCategoryActiveBar');
+  if (bar) bar.style.display = 'none';
+  searchInput.value = '';
+  performSearch('');
+}
+window.clearSmartCategory = clearSmartCategory;
+
 function toggleSortMenu(e) {
   if (e) e.stopPropagation();
   initAudio();
@@ -962,7 +1439,11 @@ function toggleSortMenu(e) {
 
   const sortMenu = document.getElementById('sortDropdown');
   const filterMenu = document.getElementById('filterDropdown');
+  const catMenu = document.getElementById('categoriesDropdown');
   if (filterMenu) filterMenu.style.display = 'none';
+  if (catMenu) catMenu.style.display = 'none';
+  document.getElementById('categoriesRoundBtn')?.classList.remove('active');
+
   const filterBtn = document.getElementById('filterRoundBtn');
   if (filterBtn && !filterBtn.classList.contains('has-filter')) {
     filterBtn.classList.remove('active');
@@ -984,7 +1465,11 @@ function toggleFilterMenu(e) {
 
   const filterMenu = document.getElementById('filterDropdown');
   const sortMenu = document.getElementById('sortDropdown');
+  const catMenu = document.getElementById('categoriesDropdown');
   if (sortMenu) sortMenu.style.display = 'none';
+  if (catMenu) catMenu.style.display = 'none';
+  document.getElementById('categoriesRoundBtn')?.classList.remove('active');
+
   const sortBtn = document.getElementById('sortRoundBtn');
   if (sortBtn && currentSort === 'default') {
     sortBtn.classList.remove('active');
@@ -1070,6 +1555,15 @@ function updateFilterButtonState() {
 
 // Закриття меню при кліку за межами
 document.addEventListener('click', (e) => {
+  const catMenu = document.getElementById('categoriesDropdown');
+  const catBtn = document.getElementById('categoriesRoundBtn');
+  if (catMenu && catMenu.style.display !== 'none') {
+    if (!catMenu.contains(e.target) && !catBtn?.contains(e.target)) {
+      catMenu.style.display = 'none';
+      catBtn?.classList.remove('active');
+    }
+  }
+
   const sortMenu = document.getElementById('sortDropdown');
   const sortBtn = document.getElementById('sortRoundBtn');
   if (sortMenu && sortMenu.style.display !== 'none') {
@@ -1147,12 +1641,12 @@ function cycleViewMode() {
   playTickSound(1);
   triggerHaptics(1, true);
 
-  if (currentViewMode === '3d') {
-    switchViewMode('grid');
-  } else if (currentViewMode === 'grid') {
+  if (currentViewMode === 'grid') {
+    switchViewMode('3d');
+  } else if (currentViewMode === '3d') {
     switchViewMode('dual');
   } else {
-    switchViewMode('3d');
+    switchViewMode('grid');
   }
 }
 window.cycleViewMode = cycleViewMode;
@@ -1164,7 +1658,14 @@ function renderStage() {
   stage.innerHTML = '';
   cards = [];
 
-  if (filteredProducts.length === 0) {
+  const totalItems = filteredProducts.length;
+  const totalTabs = Math.max(1, Math.ceil(totalItems / ITEMS_PER_TAB));
+  if (currentTab > totalTabs) currentTab = totalTabs;
+
+  const startIndex = (currentTab - 1) * ITEMS_PER_TAB;
+  const pageItems = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_TAB);
+
+  if (pageItems.length === 0) {
     stage.innerHTML = `
       <div style="text-align:center; padding:50px 20px; background:#fff; border-radius:22px; box-shadow:var(--shadow-md); width:320px;">
         <div style="font-size:48px; margin-bottom:12px;">🔍</div>
@@ -1176,13 +1677,16 @@ function renderStage() {
     return;
   }
 
-  filteredProducts.forEach((product, idx) => {
+  pageItems.forEach((product, idx) => {
     addCard(product, idx);
   });
 
   activeIdx = 0;
   applyPositions();
   updateCounter();
+
+  // Нижня пагінація для 3D режиму
+  renderStageBottomPagination(totalTabs, totalItems);
 }
 
 function createCardSlot(product, index) {
@@ -1474,11 +1978,8 @@ function updateCounter() {
   if (cards.length === 0) {
     stageCounter.textContent = '0 товарів';
   } else {
-    if (!currentSearchQuery) {
-      stageCounter.textContent = `🔥 Акція ${activeIdx + 1} з ${cards.length}`;
-    } else {
-      stageCounter.textContent = `Товар ${activeIdx + 1} з ${cards.length}`;
-    }
+    const totalTabs = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_TAB));
+    stageCounter.textContent = `Товар ${activeIdx + 1} з ${cards.length} • Вкладка ${currentTab} з ${totalTabs}`;
   }
 }
 
@@ -1671,7 +2172,14 @@ function setupStageGestures() {
 function renderGrid() {
   productsGrid.innerHTML = '';
 
-  if (filteredProducts.length === 0) {
+  const totalItems = filteredProducts.length;
+  const totalTabs = Math.max(1, Math.ceil(totalItems / ITEMS_PER_TAB));
+  if (currentTab > totalTabs) currentTab = totalTabs;
+
+  const startIndex = (currentTab - 1) * ITEMS_PER_TAB;
+  const pageItems = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_TAB);
+
+  if (pageItems.length === 0) {
     productsGrid.innerHTML = `
       <div style="text-align:center; padding:50px 20px; background:#fff; border-radius:18px; grid-column:1/-1;">
         <div style="font-size:42px; margin-bottom:10px;">🔍</div>
@@ -1682,16 +2190,20 @@ function renderGrid() {
     return;
   }
 
-  filteredProducts.forEach((p, idx) => {
+  // Рендеримо ТІЛЬКИ 100 товарів поточної вкладки
+  pageItems.forEach((p, idx) => {
     const isAtb = p.store === 'atb';
     const price = typeof p.price === 'number' ? p.price : parseFloat(p.price || 0);
     const oldPrice = p.old_price ? parseFloat(p.old_price) : null;
     const unitPrice = calculateUnitPrice(p.title, p.weight, price);
     const imgSrc = getProductImg(p);
     const inWish = wishlist.some(w => (w.link || w.title) === (p.link || p.title));
+    const isNP = p.is_nova_poshta;
+    const npBadge = isNP ? `<div style="background:var(--atb-red); color:white; font-size:10px; font-weight:bold; padding:3px 6px; border-radius:4px; margin-bottom:5px; display:inline-block;">Тільки Нова Пошта</div>` : '';
 
     const card = document.createElement('div');
     card.className = 'grid-product-card';
+    card.dataset.productId = p.link || p.product_url || p.title;
     card.innerHTML = `
       <div class="grid-card-img-area">
         <img class="grid-card-img" src="${imgSrc || FALLBACK_SVG}" alt="${p.title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
@@ -1706,16 +2218,17 @@ function renderGrid() {
         <div class="in-stock available">
           <span>${p.weight ? p.weight : 'В наявності'}</span>
         </div>
+        ${npBadge}
         <div class="grid-card-price-row">
           <div>
             <span class="grid-card-price">${price.toFixed(2)} ₴</span>
             ${oldPrice && oldPrice > price ? `<span class="grid-card-old-price">${oldPrice.toFixed(2)} ₴</span>` : ''}
           </div>
           <div style="display:flex; gap:6px;">
-            <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${idx}" title="В бажане">
+            <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
               <i class="fa-solid fa-heart"></i>
             </button>
-            <button class="btn-cart" id="cartBtnGrid_${idx}" style="padding:8px 12px;" title="Додати у кошик">
+            <button class="btn-cart" id="cartBtnGrid_${startIndex + idx}" style="padding:8px 12px;" title="Додати у кошик">
               <i class="fa-solid fa-cart-plus"></i>
             </button>
           </div>
@@ -1723,26 +2236,27 @@ function renderGrid() {
       </div>
     `;
 
-    // Клік на картку відкриває деталі / сайт
     card.addEventListener('click', () => {
       window.open(p.link || p.product_url || '#', '_blank');
     });
 
-    // Окремі кліки на кнопки
-    const wBtn = card.querySelector(`#wishBtnGrid_${idx}`);
-    wBtn.addEventListener('click', (e) => {
+    const wBtn = card.querySelector(`#wishBtnGrid_${startIndex + idx}`);
+    wBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleWishlist(p, wBtn);
     });
 
-    const cBtn = card.querySelector(`#cartBtnGrid_${idx}`);
-    cBtn.addEventListener('click', (e) => {
+    const cBtn = card.querySelector(`#cartBtnGrid_${startIndex + idx}`);
+    cBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       addToCart(p, card);
     });
 
     productsGrid.appendChild(card);
   });
+
+  // Нижня пагінація вкладками
+  renderGridBottomPagination(totalTabs, totalItems);
 }
 
 // ═══════════════════════════════════════════
@@ -1823,6 +2337,17 @@ function calculateProductMatchScore(atb, silpo) {
   if (matchCount >= 2 && tokenScore >= 0.38) return (tokenScore * 0.6) + (weightScore * 0.4) + brandBonus;
 
   return -1;
+
+  // Pagination controls
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  if (totalPages > 1) {
+    let html = `<div style="text-align: center; margin-top: 20px; padding-bottom: 20px; grid-column: 1/-1;">`;
+    if (currentPage > 1) html += `<button onclick="currentPage--; renderCurrentView()" style="margin: 0 5px; padding: 10px 20px; border-radius: 10px; background: var(--silpo-orange); color: white; border: none; cursor: pointer; font-weight: bold;">Назад</button>`;
+    html += `<span style="margin: 0 10px; font-weight: bold; color: var(--text1);">Сторінка ${currentPage} з ${totalPages}</span>`;
+    if (currentPage < totalPages) html += `<button onclick="currentPage++; renderCurrentView()" style="margin: 0 5px; padding: 10px 20px; border-radius: 10px; background: var(--silpo-orange); color: white; border: none; cursor: pointer; font-weight: bold;">Вперед</button>`;
+    html += `</div>`;
+    productsGrid.insertAdjacentHTML('beforeend', html);
+  }
 }
 
 function renderDualView() {
@@ -2482,3 +3007,16 @@ function loadSavedWishlist() {
     updateWishlistUI();
   } catch (e) {}
 }
+
+function toggleNovaPoshta() {
+  showNovaPoshta = document.getElementById('showNovaPoshta')?.checked || false;
+  applyFiltersAndRender();
+}
+window.toggleNovaPoshta = toggleNovaPoshta;
+
+function renderCurrentView() {
+  if (currentViewMode === '3d') renderStage();
+  else if (currentViewMode === 'grid') renderGrid();
+  else if (currentViewMode === 'dual') renderDualView();
+}
+window.renderCurrentView = renderCurrentView;

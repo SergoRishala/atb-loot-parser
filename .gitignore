@@ -21,9 +21,15 @@ Thumbs.db
 
 # Чорнові тестові та діагностичні скрипти
 test_*.py
+!test_api.py
 find_*.py
 inspect_*.py
 debug_search.py
 check_prices.py
 verify_all_branches.py
 user_atb_code.txt
+
+# IDE
+.idea/
+.vscode/
+

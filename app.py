@@ -157,6 +157,118 @@ def get_cached_promos(branch_id: str, limit: int = 60):
 
 
 # ═══════════════════════════════════════════
+#   РОЗУМНІ КАТЕГОРІЇ (SMART CATEGORIES)
+# ═══════════════════════════════════════════
+SMART_CATEGORIES = {
+    "напої": {
+        "title": "🥤 Напої, соки, води та енергетики",
+        "sub_queries": [
+            ["напій", "сік", "енергетик"],
+            ["нектар", "вода", "лимонад"],
+            ["кола", "квас", "чай"]
+        ],
+        "aliases": ["напої", "напій", "drinks", "напитки", "попити", "газировка", "соки", "нектари", "енергетики"]
+    },
+    "молочка": {
+        "title": "🥛 Молочні продукти",
+        "sub_queries": [
+            ["молоко", "сир", "йогурт"],
+            ["кефір", "сметана", "масло"],
+            ["творог", "вершки", "ряжанка"]
+        ],
+        "aliases": ["молочка", "молочні", "молочні продукти", "молочное"]
+    },
+    "м'ясо": {
+        "title": "🥩 М'ясо та ковбаси",
+        "sub_queries": [
+            ["м'ясо", "ковбаса", "сосиски"],
+            ["курка", "філе", "фарш"],
+            ["свинина", "балик", "сардельки"]
+        ],
+        "aliases": ["м'ясо", "мясо", "ковбаси", "ковбаса", "сосиски", "м'ясні"]
+    },
+    "солодощі": {
+        "title": "🍫 Солодощі та десерти",
+        "sub_queries": [
+            ["шоколад", "цукерки", "печиво"],
+            ["вафлі", "батончик", "торт"],
+            ["круасан", "мармелад", "халва"]
+        ],
+        "aliases": ["солодощі", "солодке", "десерти", "цукерки", "печиво", "сладости"]
+    },
+    "снеки": {
+        "title": "🥔 Снеки та чипси",
+        "sub_queries": [
+            ["чипси", "сухарики", "горішки"],
+            ["снеки", "попкорн", "арахіс"]
+        ],
+        "aliases": ["снеки", "чипси", "чіпси", "снек", "хрустики"]
+    },
+    "риба": {
+        "title": "🐟 Риба та морепродукти",
+        "sub_queries": [
+            ["риба", "лосось", "скумбрія"],
+            ["оселедець", "креветки", "ікра"],
+            ["тунець", "хек", "мідії"]
+        ],
+        "aliases": ["риба", "морепродукти", "рыба", "рибне"]
+    },
+    "овочі": {
+        "title": "🥦 Свіжі овочі",
+        "sub_queries": [
+            ["помідори", "огірки", "картопля"],
+            ["капуста", "морква", "цибуля"],
+            ["перець", "буряк", "зелень"]
+        ],
+        "aliases": ["овочі", "овощи", "зелень"]
+    },
+    "фрукти": {
+        "title": "🍎 Свіжі фрукти",
+        "sub_queries": [
+            ["яблука", "банани", "апельсини"],
+            ["лимони", "мандарини", "виноград"],
+            ["груші", "ківі", "ананас"]
+        ],
+        "aliases": ["фрукти", "ягоди", "фрукты"]
+    },
+    "бакалія": {
+        "title": "🌾 Бакалія, крупи та макарони",
+        "sub_queries": [
+            ["макарони", "гречка", "рис"],
+            ["крупа", "борошно", "олія"],
+            ["цукор", "сіль", "вівсянка"]
+        ],
+        "aliases": ["бакалія", "крупи", "макарони", "бакалея"]
+    },
+    "кава": {
+        "title": "☕ Кава та чай",
+        "sub_queries": [
+            ["кава", "чай"]
+        ],
+        "aliases": ["кава та чай", "гарячі напої", "чаї"]
+    },
+    "хімія": {
+        "title": "🧼 Побутова хімія",
+        "sub_queries": [
+            ["порошок", "мило", "шампунь"],
+            ["миючий засіб", "зубна паста", "папір"]
+        ],
+        "aliases": ["побутова хімія", "хімія", "гігієна", "догляд"]
+    }
+}
+
+def find_smart_category(raw_q: str):
+    q = raw_q.lower().strip()
+    for cat_id, cat_info in SMART_CATEGORIES.items():
+        if q == cat_id or q in cat_info["aliases"]:
+            return cat_id, cat_info
+        for alias in cat_info["aliases"]:
+            if alias in q and len(alias) >= 4:
+                return cat_id, cat_info
+    return None, None
+
+
+# ═══════════════════════════════════════════
 #   ПОШУК ТОВАРІВ (АТБ + СІЛЬПО)
 # ═══════════════════════════════════════════
 @app.route("/api/search")
@@ -185,39 +297,106 @@ def search():
     errors = {}
 
     if is_promo_mode:
-        cached_atb, cached_silpo = get_cached_promos(branch_id, limit=limit)
-        atb_items = cached_atb
-        silpo_items = cached_silpo
-    else:
-        def fetch_atb():
+        def fetch_promo_atb():
             try:
-                res = atb_api.search_atb(raw_query, page=page, timeout=15)
-                return res.get("products", [])
+                return atb_api.get_atb_promos_page(page=page, urls_per_batch=2, timeout=12)
             except Exception as e:
                 errors["atb"] = str(e)
                 return []
 
-        def fetch_silpo():
+        def fetch_promo_silpo():
             try:
-                res = silpo_api.search_products(
-                    query=raw_query,
-                    branch_id=branch_id,
-                    limit=limit,
-                    offset=(page - 1) * limit,
-                    only_promo=only_promo,
-                    timeout=15
-                )
-                return res.get("items", [])
+                s_limit = 50 if store == "all" else 100
+                s_offset = (page - 1) * s_limit
+                return silpo_api.get_silpo_promotions(branch_id=branch_id, limit=s_limit, offset=s_offset, timeout=12)
             except Exception as e:
                 errors["silpo"] = str(e)
                 return []
 
         if store == "all":
             with ThreadPoolExecutor(max_workers=2) as executor:
+                future_atb = executor.submit(fetch_promo_atb)
+                future_silpo = executor.submit(fetch_promo_silpo)
+                atb_items = future_atb.result() or []
+                silpo_items = future_silpo.result() or []
+        elif store == "atb":
+            atb_items = fetch_promo_atb()
+        elif store == "silpo":
+            silpo_items = fetch_promo_silpo()
+    else:
+        cat_id, cat_info = find_smart_category(raw_query)
+        if cat_info:
+            subq_batches = cat_info["sub_queries"]
+            current_subqueries = subq_batches[(page - 1) % len(subq_batches)]
+
+            def fetch_atb():
+                items = []
+                seen = set()
+                try:
+                    with ThreadPoolExecutor(max_workers=len(current_subqueries)) as ex:
+                        for res in ex.map(lambda q: atb_api.search_atb(q, timeout=12).get("products", []), current_subqueries):
+                            for p in res:
+                                k = p.get("product_url") or p.get("title")
+                                if k not in seen:
+                                    seen.add(k)
+                                    items.append(p)
+                    return items
+                except Exception as e:
+                    errors["atb"] = str(e)
+                    return []
+
+            def fetch_silpo():
+                items = []
+                seen = set()
+                try:
+                    s_limit = 35 if store == "all" else 60
+                    with ThreadPoolExecutor(max_workers=len(current_subqueries)) as ex:
+                        for res in ex.map(lambda q: silpo_api.search_products(q, branch_id=branch_id, limit=s_limit, only_promo=only_promo, timeout=12).get("items", []), current_subqueries):
+                            for p in res:
+                                k = p.get("product_url") or p.get("title")
+                                if k not in seen:
+                                    seen.add(k)
+                                    items.append(p)
+                    return items
+                except Exception as e:
+                    errors["silpo"] = str(e)
+                    return []
+        else:
+            def fetch_atb():
+                try:
+                    res = atb_api.search_atb(raw_query, page=page, timeout=15)
+                    return res.get("products", [])
+                except Exception as e:
+                    errors["atb"] = str(e)
+                    return []
+
+            def fetch_silpo():
+                try:
+                    if store == "silpo":
+                        s_limit = 100
+                        s_offset = (page - 1) * 100
+                    else:
+                        s_limit = 76
+                        s_offset = (page - 1) * 76
+                    res = silpo_api.search_products(
+                        query=raw_query,
+                        branch_id=branch_id,
+                        limit=s_limit,
+                        offset=s_offset,
+                        only_promo=only_promo,
+                        timeout=15
+                    )
+                    return res.get("items", [])
+                except Exception as e:
+                    errors["silpo"] = str(e)
+                    return []
+
+        if store == "all":
+            with ThreadPoolExecutor(max_workers=2) as executor:
                 future_atb = executor.submit(fetch_atb)
                 future_silpo = executor.submit(fetch_silpo)
-                atb_items = future_atb.result()
-                silpo_items = future_silpo.result()
+                atb_items = future_atb.result() or []
+                silpo_items = future_silpo.result() or []
         elif store == "atb":
             atb_items = fetch_atb()
         elif store == "silpo":
@@ -334,11 +513,14 @@ def search():
         "success": True,
         "query": query,
         "store": store,
+        "page": page,
+        "limit": limit,
         "is_promo": is_promo_mode,
         "total": len(products),
         "atb_count": len(atb_items),
         "silpo_count": len(silpo_items),
         "items": products,
+        "has_more": len(products) > 0,
         "errors": errors if errors else None
     })
 
