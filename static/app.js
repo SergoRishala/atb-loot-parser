@@ -15,13 +15,13 @@ let currentSearchSeq = 0;
 let showNovaPoshta = false;
 let activeCategory = null; // Поточна обрана категорія
 let currentSearchQuery = ''; // За замовчуванням порожній запит (завантажуються акції Сільпо & АТБ)
-let currentSort = 'default'; // Сортування за замовчуванням
+let currentSort = 'discount_desc'; // Сортування за замовчуванням — макс. знижка
 let currentStore = 'all'; // 'all', 'atb', 'silpo'
 let filterDiscountMin = 0; // 0 = всі, 1 = будь-яка знижка, 20 = >=20%, 30 = >=30%, 50 = >=50%
 let filterPriceRange = 'all'; // 'all', '0-50', '50-100', '100-250', '250+'
 let filterOnlyWithWeight = false; // Тільки з вагою (ціна за 100г/мл)
 let filterOnlyInStock = true; // Тільки в наявності
-let currentViewMode = 'grid'; // '3d', 'grid', 'dual'
+let currentViewMode = 'grid2'; // 'grid2' (2 col), 'grid3' (3 col), '3d' (карусель), 'dual'
 let selectedBranchId = '1edb7351-d076-60fe-a545-51c4e9ef1e54'; // Дефолтне Сільпо (Київ)
 let cart = [];
 let wishlist = [];
@@ -541,9 +541,10 @@ document.addEventListener('DOMContentLoaded', () => {
   checkMcpStatus();
   setupStageGestures();
   syncSettingsUI();
-  switchViewMode('grid');
+  switchViewMode('grid2');
 
-  // Початкове завантаження: гарячі акції Сільпо та АТБ
+  // Початкове завантаження: гарячі акції Сільпо та АТБ (сортуємо за макс. знижкою)
+  currentSort = 'discount_desc';
   performSearch('');
 
   // Миттєве розблокування Web Audio на перший будь-який дотик або клік користувача
@@ -746,8 +747,17 @@ async function startBackgroundLoading(query, seq) {
 
       if (newUnique.length > 0) {
         allProducts.push(...newUnique);
-        // Оновлюємо вкладки та лічильник без збивання позиції користувача
-        applyFiltersAndRender_NoReset();
+        // Якщо відкрита карусель — одразу додаємо нові картки
+        if (currentViewMode === '3d') {
+          // Застосовуємо фільтри для нових товарів
+          applyFiltersAndRender_Core();
+          const newFiltered = filteredProducts.slice(_stageLoadedCount);
+          if (newFiltered.length > 0) appendToStage(newFiltered);
+          updateCatalogCountDisplay();
+        } else {
+          // Оновлюємо сітку/порівняння без збивання позиції
+          applyFiltersAndRender_NoReset();
+        }
       }
 
       if (!data.has_more || data.items.length < 15) {
@@ -775,9 +785,11 @@ async function startBackgroundLoading(query, seq) {
   }
 }
 
+// Таймер зникнення лічильника в шапці
+let _headerChipTimer = null;
+
 function updateCatalogCountDisplay(isLoading, count) {
   const chipText = document.getElementById('catalogFoundText');
-  if (!chipText) return;
   const total = count !== undefined ? count : (allProducts ? allProducts.length : 0);
   const totalFiltered = filteredProducts ? filteredProducts.length : 0;
   const totalTabs = Math.max(1, Math.ceil(totalFiltered / ITEMS_PER_TAB));
@@ -785,7 +797,7 @@ function updateCatalogCountDisplay(isLoading, count) {
   const atbCount = filteredProducts ? filteredProducts.filter(p => p.store === 'atb').length : 0;
   const silpoCount = filteredProducts ? filteredProducts.filter(p => p.store === 'silpo').length : 0;
 
-  // Оновлюємо також цифри на кнопках фільтра магазину
+  // Оновлюємо кнопки фільтра магазину
   const ftAll = document.getElementById('ftStoreAll');
   const ftAtb = document.getElementById('ftStoreAtb');
   const ftSilpo = document.getElementById('ftStoreSilpo');
@@ -796,15 +808,54 @@ function updateCatalogCountDisplay(isLoading, count) {
   if (ftAtb) ftAtb.textContent = `🔴 АТБ (${totalAtbAll})`;
   if (ftSilpo) ftSilpo.textContent = `🟠 Сільпо (${totalSilpoAll})`;
 
-  if (isLoading && total === 0) {
-    chipText.innerHTML = `<span class="loading-spin-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;"></span> Завантаження товарів...`;
-  } else {
-    chipText.innerHTML = `
-      <span>Знайдено: <strong>${totalFiltered}</strong> товарів</span>
-      <span class="store-badge-stat store-badge-atb" title="Товарів з АТБ"><span class="store-dot-mini atb-dot"></span> АТБ: <b>${atbCount}</b></span>
-      <span class="store-badge-stat store-badge-silpo" title="Товарів із Сільпо"><span class="store-dot-mini silpo-dot"></span> Сільпо: <b>${silpoCount}</b></span>
-      <span class="tab-badge-stat">Вкладка <b>${currentTab}</b> з <b>${totalTabs}</b></span>
+  // --- Оновлення блоку статистики в Налаштуваннях & Опціях ---
+  const adminStatsBox = document.getElementById('adminStatsBox');
+  if (adminStatsBox) {
+    adminStatsBox.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span>Всього знайдено:</span> <b>${totalFiltered} шт</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--atb-red);">
+        <span>🔴 Товарів з АТБ:</span> <b>${atbCount} шт</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--silpo-orange);">
+        <span>🟠 Товарів із Сільпо:</span> <b>${silpoCount} шт</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:12px; color:var(--text3);">
+        <span>Поточна вкладка:</span> <b>${currentTab} з ${totalTabs}</b>
+      </div>
     `;
+  }
+
+  // --- Оновлення лічильника в шапці ---
+  const headerChip = document.getElementById('headerFoundChip');
+  const headerText = document.getElementById('headerFoundText');
+
+  if (headerChip && headerText) {
+    if (isLoading && total === 0) {
+      headerText.innerHTML = `<span class="loading-spin-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:#3563e9;animation:spin 0.8s linear infinite;"></span> Завантаження...`;
+    } else {
+      headerText.innerHTML = `<b>${totalFiltered}</b> тов. &nbsp;🔴<b>${atbCount}</b> 🟠<b>${silpoCount}</b>`;
+    }
+    headerChip.style.display = 'flex';
+
+    // Запускаємо таймер зникнення (10 сек після останнього оновлення)
+    if (_headerChipTimer) clearTimeout(_headerChipTimer);
+    if (!isLoading) {
+      _headerChipTimer = setTimeout(() => {
+        headerChip.style.opacity = '0';
+        setTimeout(() => { headerChip.style.display = 'none'; headerChip.style.opacity = '1'; }, 500);
+      }, 10000);
+    }
+  }
+
+  // --- Оновлення прихованого внутрішнього тексту (для JS сумісності) ---
+  if (chipText) {
+    if (isLoading && total === 0) {
+      chipText.innerHTML = `Завантаження товарів...`;
+    } else {
+      chipText.innerHTML = `Знайдено: <strong>${totalFiltered}</strong> | АТБ: ${atbCount} | Сільпо: ${silpoCount}`;
+    }
   }
 }
 
@@ -891,6 +942,40 @@ function getSavingAmount(p) {
   return 0;
 }
 
+function renderCompactPagination(totalTabs) {
+  // Генерує компактну пагінацію: ‹ 1 2 3 ... 8 9 ›
+  if (totalTabs <= 1) return '';
+  const MAX_VISIBLE = 5;
+  let pages = [];
+
+  if (totalTabs <= MAX_VISIBLE + 2) {
+    for (let i = 1; i <= totalTabs; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    let start = Math.max(2, currentTab - 1);
+    let end = Math.min(totalTabs - 1, currentTab + 1);
+    if (currentTab <= 3) { start = 2; end = Math.min(5, totalTabs - 1); }
+    if (currentTab >= totalTabs - 2) { start = Math.max(2, totalTabs - 4); end = totalTabs - 1; }
+    if (start > 2) pages.push('...');
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalTabs - 1) pages.push('...');
+    pages.push(totalTabs);
+  }
+
+  const btns = pages.map(p => {
+    if (p === '...') return `<span class="pg-dots">…</span>`;
+    return `<button class="pg-btn ${p === currentTab ? 'active' : ''}" onclick="selectCatalogTab(${p})">${p}</button>`;
+  }).join('');
+
+  return `
+    <div class="compact-pagination">
+      <button class="pg-nav" ${currentTab <= 1 ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab - 1})">‹</button>
+      ${btns}
+      <button class="pg-nav" ${currentTab >= totalTabs ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab + 1})">›</button>
+    </div>
+  `;
+}
+
 function renderGridBottomPagination(totalTabs, totalItems) {
   let bottomNav = productsGrid.querySelector('.catalog-bottom-pagination');
   if (totalTabs <= 1) {
@@ -902,34 +987,7 @@ function renderGridBottomPagination(totalTabs, totalItems) {
     bottomNav.className = 'catalog-bottom-pagination';
     productsGrid.appendChild(bottomNav);
   }
-
-  let tabsHtml = '';
-  for (let i = 1; i <= totalTabs; i++) {
-    const startNum = (i - 1) * ITEMS_PER_TAB + 1;
-    const endNum = Math.min(i * ITEMS_PER_TAB, totalItems);
-    const isActive = i === currentTab;
-    tabsHtml += `
-      <button class="catalog-tab-btn ${isActive ? 'active' : ''}" onclick="selectCatalogTab(${i})">
-        <span>Вкладка ${i}</span>
-        <span class="tab-badge-count">${startNum}–${endNum}</span>
-      </button>
-    `;
-  }
-
-  bottomNav.innerHTML = `
-    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-      <button class="catalog-page-btn" ${currentTab <= 1 ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab - 1})">
-        <i class="fa-solid fa-chevron-left"></i> Попередня вкладка
-      </button>
-      <span class="catalog-page-info">Вкладка <strong>${currentTab}</strong> з <strong>${totalTabs}</strong> (${totalItems} товарів)</span>
-      <button class="catalog-page-btn" ${currentTab >= totalTabs ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab + 1})">
-        Наступна вкладка <i class="fa-solid fa-chevron-right"></i>
-      </button>
-    </div>
-    <div class="catalog-tabs-list" style="justify-content:center; flex-wrap:wrap; width:100%; gap:8px;">
-      ${tabsHtml}
-    </div>
-  `;
+  bottomNav.innerHTML = renderCompactPagination(totalTabs);
 }
 
 function renderStageBottomPagination(totalTabs, totalItems) {
@@ -940,35 +998,9 @@ function renderStageBottomPagination(totalTabs, totalItems) {
     stageNav.innerHTML = '';
     return;
   }
-
-  let tabsHtml = '';
-  for (let i = 1; i <= totalTabs; i++) {
-    const startNum = (i - 1) * ITEMS_PER_TAB + 1;
-    const endNum = Math.min(i * ITEMS_PER_TAB, totalItems);
-    const isActive = i === currentTab;
-    tabsHtml += `
-      <button class="catalog-tab-btn ${isActive ? 'active' : ''}" onclick="selectCatalogTab(${i})">
-        <span>Вкладка ${i}</span>
-        <span class="tab-badge-count">${startNum}–${endNum}</span>
-      </button>
-    `;
-  }
-
-  stageNav.innerHTML = `
-    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-      <button class="catalog-page-btn" ${currentTab <= 1 ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab - 1})">
-        <i class="fa-solid fa-chevron-left"></i> Назад
-      </button>
-      <span class="catalog-page-info">Вкладка <strong>${currentTab}</strong> з <strong>${totalTabs}</strong> (${totalItems} товарів)</span>
-      <button class="catalog-page-btn" ${currentTab >= totalTabs ? 'disabled' : ''} onclick="selectCatalogTab(${currentTab + 1})">
-        Вперед <i class="fa-solid fa-chevron-right"></i>
-      </button>
-    </div>
-    <div class="catalog-tabs-list" style="justify-content:center; flex-wrap:wrap; width:100%; gap:8px;">
-      ${tabsHtml}
-    </div>
-  `;
+  stageNav.innerHTML = renderCompactPagination(totalTabs);
   stageNav.style.display = 'flex';
+  stageNav.style.justifyContent = 'center';
 }
 
 function applyFiltersAndRender_NoReset() {
@@ -982,7 +1014,7 @@ function applyFiltersAndRender_NoReset() {
 
   // Якщо сортування активне і новий товар випередив інші (наприклад знижка 62% стала вище за 60%),
   // виявляємо зміну порядку карток на поточній вкладці і оновлюємо сітку зі збереженням скролу!
-  if (currentViewMode === 'grid') {
+  if (currentViewMode === 'grid2' || currentViewMode === 'grid3') {
     const startIndex = (currentTab - 1) * ITEMS_PER_TAB;
     const pageItems = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_TAB);
     const existingCards = productsGrid.querySelectorAll('.grid-product-card');
@@ -1368,11 +1400,14 @@ function toggleCategoriesMenu(e) {
   if (sortMenu) sortMenu.style.display = 'none';
   if (filterMenu) filterMenu.style.display = 'none';
 
-  const btn = document.getElementById('categoriesRoundBtn');
+  // Обидві кнопки категорій (в шапці та у пошуку)
+  const btn1 = document.getElementById('categoriesRoundBtn');
+  const btn2 = document.getElementById('categoriesHeaderBtn');
   if (!catMenu) return;
   const isHidden = catMenu.style.display === 'none';
   catMenu.style.display = isHidden ? 'block' : 'none';
-  if (btn) btn.classList.toggle('active', isHidden);
+  if (btn1) btn1.classList.toggle('active', isHidden);
+  if (btn2) btn2.classList.toggle('active', isHidden);
 }
 window.toggleCategoriesMenu = toggleCategoriesMenu;
 
@@ -1509,7 +1544,7 @@ function selectSortOption(sortKey) {
   };
 
   const badge = document.getElementById('sortActiveBadge');
-  if (badge) badge.textContent = sortBadgeNames[sortKey] || '⚡ Дефолт';
+  if (badge) badge.textContent = sortBadgeNames[sortKey] || '🔥 Знижка %';
 
   const sortMenu = document.getElementById('sortDropdown');
   if (sortMenu) sortMenu.style.display = 'none';
@@ -1557,10 +1592,12 @@ function updateFilterButtonState() {
 document.addEventListener('click', (e) => {
   const catMenu = document.getElementById('categoriesDropdown');
   const catBtn = document.getElementById('categoriesRoundBtn');
+  const catBtn2 = document.getElementById('categoriesHeaderBtn');
   if (catMenu && catMenu.style.display !== 'none') {
-    if (!catMenu.contains(e.target) && !catBtn?.contains(e.target)) {
+    if (!catMenu.contains(e.target) && !catBtn?.contains(e.target) && !catBtn2?.contains(e.target)) {
       catMenu.style.display = 'none';
       catBtn?.classList.remove('active');
+      catBtn2?.classList.remove('active');
     }
   }
 
@@ -1599,19 +1636,30 @@ function switchViewMode(mode) {
   const dualPill = document.getElementById('dualCompareBtn');
   if (dualPill) dualPill.classList.toggle('active', mode === 'dual');
 
-  const gridPill = document.getElementById('gridModeBtn');
-  if (gridPill) gridPill.classList.toggle('active', mode === 'grid');
-
-  // Оновлюємо іконку на круглій кнопці перемикання біля пошуку
+  // Оновлюємо іконку на круглій кнопці перемикання (у пошуку)
   const roundIcon = document.getElementById('viewToggleRoundIcon');
   if (roundIcon) {
     if (mode === '3d') {
       roundIcon.className = 'fa-solid fa-cube';
-    } else if (mode === 'grid') {
+    } else if (mode === 'grid2') {
+      roundIcon.className = 'fa-solid fa-table-cells-large';
+    } else if (mode === 'grid3') {
       roundIcon.className = 'fa-solid fa-table-cells';
     } else if (mode === 'dual') {
       roundIcon.className = 'fa-solid fa-bolt';
     }
+  }
+
+  // Оновлюємо підказку кнопки
+  const roundBtn = document.getElementById('viewToggleRoundBtn');
+  const labels = { grid2: '2 колонки', grid3: '3 колонки', '3d': 'Карусель', dual: 'Порівняння' };
+  if (roundBtn) roundBtn.title = `Режим: ${labels[mode] || mode} → клік для зміни`;
+
+  // CSS-клас кількості колонок
+  if (productsGrid) {
+    productsGrid.classList.remove('cols-2', 'cols-3');
+    if (mode === 'grid2') productsGrid.classList.add('cols-2');
+    if (mode === 'grid3') productsGrid.classList.add('cols-3');
   }
 
   if (mode === '3d') {
@@ -1620,7 +1668,7 @@ function switchViewMode(mode) {
     productsGrid.style.display = 'none';
     dualViewContainer.style.display = 'none';
     renderStage();
-  } else if (mode === 'grid') {
+  } else if (mode === 'grid2' || mode === 'grid3') {
     document.body.classList.remove('mode-3d-locked');
     stageContainer.style.display = 'none';
     productsGrid.style.display = 'grid';
@@ -1641,12 +1689,14 @@ function cycleViewMode() {
   playTickSound(1);
   triggerHaptics(1, true);
 
-  if (currentViewMode === 'grid') {
+  if (currentViewMode === 'grid2') {
+    switchViewMode('grid3');
+  } else if (currentViewMode === 'grid3') {
     switchViewMode('3d');
   } else if (currentViewMode === '3d') {
     switchViewMode('dual');
   } else {
-    switchViewMode('grid');
+    switchViewMode('grid2');
   }
 }
 window.cycleViewMode = cycleViewMode;
@@ -1654,18 +1704,16 @@ window.cycleViewMode = cycleViewMode;
 // ═══════════════════════════════════════════
 //   РЕЖИМ 1: 3D COVER-FLOW СЦЕНА КАРТОК
 // ═══════════════════════════════════════════
+// Кількість завантажених карток у каруселі (поповнюється під час фонового завантаження)
+let _stageLoadedCount = 0;
+
 function renderStage() {
+  // В режимі каруселі — всі товари без вкладок, безперервна прокрутка
   stage.innerHTML = '';
   cards = [];
+  _stageLoadedCount = 0;
 
-  const totalItems = filteredProducts.length;
-  const totalTabs = Math.max(1, Math.ceil(totalItems / ITEMS_PER_TAB));
-  if (currentTab > totalTabs) currentTab = totalTabs;
-
-  const startIndex = (currentTab - 1) * ITEMS_PER_TAB;
-  const pageItems = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_TAB);
-
-  if (pageItems.length === 0) {
+  if (filteredProducts.length === 0) {
     stage.innerHTML = `
       <div style="text-align:center; padding:50px 20px; background:#fff; border-radius:22px; box-shadow:var(--shadow-md); width:320px;">
         <div style="font-size:48px; margin-bottom:12px;">🔍</div>
@@ -1677,16 +1725,31 @@ function renderStage() {
     return;
   }
 
-  pageItems.forEach((product, idx) => {
+  // Відображаємо всі вже завантажені товари одразу
+  filteredProducts.forEach((product, idx) => {
     addCard(product, idx);
   });
+  _stageLoadedCount = filteredProducts.length;
 
   activeIdx = 0;
   applyPositions();
   updateCounter();
 
-  // Нижня пагінація для 3D режиму
-  renderStageBottomPagination(totalTabs, totalItems);
+  // Приховуємо пагінацію (в каруселі вона не потрібна)
+  const stageNav = document.getElementById('stageBottomPagination');
+  if (stageNav) { stageNav.style.display = 'none'; stageNav.innerHTML = ''; }
+}
+
+// Додаємо нові товари до каруселі під час фонового завантаження
+function appendToStage(newItems) {
+  const startIdx = _stageLoadedCount;
+  newItems.forEach((product, idx) => {
+    addCard(product, startIdx + idx);
+  });
+  _stageLoadedCount += newItems.length;
+  // Оновлюємо позиції лише якщо activeIdx не змінився
+  applyPositions();
+  updateCounter();
 }
 
 function createCardSlot(product, index) {
@@ -1829,9 +1892,12 @@ function createCardSlot(product, index) {
   const scrollWrap = document.createElement('div');
   scrollWrap.className = 'back-scroll-wrapper';
   scrollWrap.innerHTML = `
+    <div class="back-header-pill" style="display:inline-flex; align-items:center; gap:6px; background:var(--primary-light); color:var(--primary); font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; margin-bottom:8px;">
+      <i class="fa-solid fa-circle-info"></i> Інформація про товар
+    </div>
     <div class="back-title">${product.title}</div>
     <div class="back-specs-container">
-      <div style="text-align:center; padding:15px; color:var(--text3); font-size:12px;">Завантаження характеристик...</div>
+      <div style="text-align:center; padding:15px; color:var(--text3); font-size:12px;">Завантаження інформації про товар...</div>
     </div>
     <a href="${product.link || product.product_url || '#'}" target="_blank" class="back-store-btn" style="background:${isAtb ? 'var(--atb-red)' : 'var(--silpo-orange)'};">
       <i class="fa-solid fa-arrow-up-right-from-square"></i> Відкрити на сайті ${isAtb ? 'АТБ' : 'Сільпо'}
@@ -1978,8 +2044,9 @@ function updateCounter() {
   if (cards.length === 0) {
     stageCounter.textContent = '0 товарів';
   } else {
-    const totalTabs = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_TAB));
-    stageCounter.textContent = `Товар ${activeIdx + 1} з ${cards.length} • Вкладка ${currentTab} з ${totalTabs}`;
+    const total = filteredProducts.length;
+    const extra = isBackgroundLoading ? ' (завантажується...)' : '';
+    stageCounter.textContent = `${activeIdx + 1} / ${cards.length}${extra}`;
   }
 }
 
@@ -2410,31 +2477,77 @@ function renderDualView() {
     return;
   }
 
+  // Сортування пар
+  if (currentDualSort === 'saving') {
+    pairs.sort((a, b) => b.diff - a.diff);
+  } else if (currentDualSort === 'price_asc') {
+    pairs.sort((a, b) => a.prA - b.prA);
+  }
+  // default: sorted by match score (already done above)
+
   pairs.forEach((pair) => {
+    const imgAtb = getProductImg(pair.atb) || FALLBACK_SVG;
+    const imgSilpo = getProductImg(pair.silpo) || FALLBACK_SVG;
+    const winnerText = pair.winner === 'atb' ? `🏆 АТБ дешевше на ${pair.diff.toFixed(2)} ₴` :
+      pair.winner === 'silpo' ? `🏆 Сільпо дешевше на ${pair.diff.toFixed(2)} ₴` : '⚖️ Ціна однакова';
+    const discAtb = pair.atb.discount_percent > 5 ? `<span class="dual-disc-badge">-${pair.atb.discount_percent}%</span>` : '';
+    const discSilpo = pair.silpo.discount_percent > 5 ? `<span class="dual-disc-badge">-${pair.silpo.discount_percent}%</span>` : '';
+
     const card = document.createElement('div');
     card.className = 'dual-card';
     card.innerHTML = `
       <div class="dual-card-title">${pair.atb.title}</div>
-      <div class="dual-prices-row">
-        <div class="dual-store-box atb">
-          <div class="dual-store-label">🔴 АТБ</div>
-          <div class="dual-store-price">${pair.prA.toFixed(2)} ₴</div>
-        </div>
-        <div class="dual-store-box silpo">
-          <div class="dual-store-label">🟠 Сільпо</div>
-          <div class="dual-store-price">${pair.prB.toFixed(2)} ₴</div>
-        </div>
+      <div class="dual-products-row">
+        <a class="dual-product-card atb-card" href="${pair.atb.link || '#'}" target="_blank" onclick="event.stopPropagation()">
+          <div class="dual-prod-img-wrap">
+            <img src="${imgAtb}" alt="${pair.atb.title}" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
+            ${discAtb}
+          </div>
+          <div class="dual-prod-info">
+            <div class="dual-store-label">🔴 АТБ</div>
+            <div class="dual-prod-name">${pair.atb.title}</div>
+            ${pair.atb.weight ? `<div class="dual-prod-weight">${pair.atb.weight}</div>` : ''}
+            <div class="dual-store-price ${pair.winner === 'atb' ? 'winner-price' : ''}">${pair.prA.toFixed(2)} ₴
+              ${pair.atb.old_price ? `<span class="dual-old-price">${parseFloat(pair.atb.old_price).toFixed(2)} ₴</span>` : ''}
+            </div>
+          </div>
+        </a>
+        <div class="dual-vs-divider">VS</div>
+        <a class="dual-product-card silpo-card" href="${pair.silpo.link || pair.silpo.product_url || '#'}" target="_blank" onclick="event.stopPropagation()">
+          <div class="dual-prod-img-wrap">
+            <img src="${imgSilpo}" alt="${pair.silpo.title}" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
+            ${discSilpo}
+          </div>
+          <div class="dual-prod-info">
+            <div class="dual-store-label">🟠 Сільпо</div>
+            <div class="dual-prod-name">${pair.silpo.title}</div>
+            ${pair.silpo.weight ? `<div class="dual-prod-weight">${pair.silpo.weight}</div>` : ''}
+            <div class="dual-store-price ${pair.winner === 'silpo' ? 'winner-price' : ''}">${pair.prB.toFixed(2)} ₴
+              ${pair.silpo.old_price ? `<span class="dual-old-price">${parseFloat(pair.silpo.old_price).toFixed(2)} ₴</span>` : ''}
+            </div>
+          </div>
+        </a>
       </div>
-      <div class="dual-winner-banner">
-        ${pair.winner === 'atb' ? `🏆 В АТБ дешевше на ${pair.diff.toFixed(2)} ₴` :
-          pair.winner === 'silpo' ? `🏆 В Сільпо дешевше на ${pair.diff.toFixed(2)} ₴` : 'Ціна однакова'}
-      </div>
+      <div class="dual-winner-banner ${pair.winner}">${winnerText}</div>
     `;
-    card.addEventListener('click', () => openDualChoiceModal(pair));
     container.appendChild(card);
   });
 }
 
+
+// ═══════════════════════════════════════════
+//   СОРТУВАННЯ РЕЖИМУ ПОРІВНЯННЯ
+// ═══════════════════════════════════════════
+let currentDualSort = 'default';
+
+function selectDualSort(sortKey) {
+  currentDualSort = sortKey;
+  document.querySelectorAll('.dual-sort-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById('dualSort' + sortKey.charAt(0).toUpperCase() + sortKey.slice(1).replace('_', ''));
+  if (activeBtn) activeBtn.classList.add('active');
+  renderDualView();
+}
+window.selectDualSort = selectDualSort;
 function openDualChoiceModal(pair) {
   const modal = document.getElementById('dualChoiceModal');
   const body = document.getElementById('dualChoiceBody');
@@ -3016,7 +3129,7 @@ window.toggleNovaPoshta = toggleNovaPoshta;
 
 function renderCurrentView() {
   if (currentViewMode === '3d') renderStage();
-  else if (currentViewMode === 'grid') renderGrid();
+  else if (currentViewMode === 'grid2' || currentViewMode === 'grid3') renderGrid();
   else if (currentViewMode === 'dual') renderDualView();
 }
 window.renderCurrentView = renderCurrentView;

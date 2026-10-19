@@ -31,10 +31,20 @@
   </a>
 
   <div class="header-controls">
-    <!-- Кнопка Опції / Налаштування перенесена до кошика -->
+    <!-- Лічильник знайдених товарів у шапці -->
+    <div class="header-found-chip" id="headerFoundChip" style="display:none;">
+      <span id="headerFoundText">0 товарів</span>
+    </div>
+
+    <!-- Кнопка Опції / Налаштування -->
     <button class="admin-btn" id="adminBtn" onclick="openAdminPanel()" title="Опції, звук, вібрація та налаштування">
       <i class="fa-solid fa-sliders"></i>
       <span class="btn-text">Опції</span>
+    </button>
+
+    <!-- Кнопка Каталог категорій (зліва кошика) -->
+    <button class="round-action-btn" id="categoriesHeaderBtn" onclick="toggleCategoriesMenu(event)" title="Каталог категорій (напої, солодощі, м'ясо...)">
+      <i class="fa-solid fa-shapes"></i>
     </button>
 
     <!-- Кнопка Кошика -->
@@ -68,15 +78,10 @@
       <input type="text" id="searchInput" placeholder="Пошук товарів (напр. молоко, чипси, кава)..." autocomplete="off"/>
       <div class="search-spinner" id="searchSpinner"></div>
     </div>
-    
-    <!-- 0. Кнопка Каталог категорій -->
-    <button class="round-action-btn" id="categoriesRoundBtn" onclick="toggleCategoriesMenu(event)" title="Каталог категорій (напої, солодощі, м'ясо...)">
-      <i class="fa-solid fa-shapes"></i>
-    </button>
 
-    <!-- 1. Кнопка зміни режиму перегляду -->
-    <button class="round-action-btn view-toggle-round" id="viewToggleRoundBtn" onclick="cycleViewMode()" title="Змінити вигляд (Сітка / 3D / VS)">
-      <i class="fa-solid fa-table-cells" id="viewToggleRoundIcon"></i>
+    <!-- 1. Кнопка зміни режиму перегляду (2 → 3 → карусель → порівняння → 2) -->
+    <button class="round-action-btn view-toggle-round" id="viewToggleRoundBtn" onclick="cycleViewMode()" title="Змінити вигляд (2 / 3 / Карусель / Порівняння)">
+      <i class="fa-solid fa-table-cells-large" id="viewToggleRoundIcon"></i>
     </button>
 
     <!-- 2. Кнопка Фільтр -->
@@ -386,18 +391,13 @@
   </div>
 </div>
 
-<!-- 4.5. ПАНЕЛЬ ЛІЧИЛЬНИКА ЗНАЙДЕНИХ ТОВАРІВ (ВКЛАДКИ ТІЛЬКИ ВНИЗУ) -->
-<div class="catalog-tabs-wrapper" id="catalogTabsWrapper">
-  <div class="catalog-header-stats">
-    <div class="catalog-found-chip" id="catalogFoundChip">
-      <i class="fa-solid fa-boxes-stacked"></i>
-      <span id="catalogFoundText">Знайдено: <strong>0</strong> товарів</span>
-    </div>
-    <div class="catalog-loading-badge" id="catalogLoadingBadge" style="display: none;">
-      <span class="loading-spin-dot"></span>
-      <span id="catalogLoadingText">Підтягуються інші товари...</span>
-    </div>
-  </div>
+<!-- 4.5. ПРИХОВАНА ПАНЕЛЬ ЛІЧИЛЬНИКА (збережено для JS, відображається у шапці) -->
+<div style="display:none;" id="catalogFoundChip">
+  <span id="catalogFoundText">Знайдено: <strong>0</strong> товарів</span>
+</div>
+<div class="catalog-loading-badge" id="catalogLoadingBadge" style="display: none;">
+  <span class="loading-spin-dot"></span>
+  <span id="catalogLoadingText">Підтягуються інші товари...</span>
 </div>
 
 <!-- 5. СЦЕНА 1: 3D COVER-FLOW КАРТОК -->
@@ -414,6 +414,12 @@
   <div class="dual-view-header">
     <h3>⚡ Пряме порівняння цін «Товар в товар»</h3>
     <p>Система автоматично з'єднує однакові позиції з АТБ та Сільпо з урахуванням суворого вето брендів (Lay's ≠ Chipsters) та різниці у вазі.</p>
+    <div class="dual-sort-row">
+      <span style="font-size:12px; font-weight:700; color:var(--text2);">Сортування:</span>
+      <button class="dual-sort-btn active" id="dualSortDefault" onclick="selectDualSort('default')">⚡ За вагою збігу</button>
+      <button class="dual-sort-btn" id="dualSortSaving" onclick="selectDualSort('saving')">💰 Макс. вигода (₴)</button>
+      <button class="dual-sort-btn" id="dualSortPriceAsc" onclick="selectDualSort('price_asc')">🪙 Ціна АТБ ↑</button>
+    </div>
   </div>
   <div class="dual-table-body" id="dualTableBody"></div>
 </div>
@@ -497,17 +503,29 @@
         </div>
       </div>
 
+      <!-- 0. Інформація про товари -->
+      <div class="admin-group">
+        <div class="admin-group-label">Знайдено товарів у каталозі</div>
+        <div id="adminStatsBox" style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; font-size:13px; line-height:1.6;">
+          Завантаження статистики...
+        </div>
+      </div>
+
       <!-- 2. Режим перегляду -->
       <div class="admin-group">
         <div class="admin-group-label">Режим відображення сторінки</div>
         <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="admin-option-btn" onclick="switchViewMode('grid2'); closeAdminPanel();">
+            <i class="fa-solid fa-table-cells-large" style="color:var(--primary); font-size:16px;"></i>
+            <span>2 товари в ряд (за замовчуванням)</span>
+          </div>
+          <div class="admin-option-btn" onclick="switchViewMode('grid3'); closeAdminPanel();">
+            <i class="fa-solid fa-table-cells" style="color:var(--primary); font-size:16px;"></i>
+            <span>3 товари в ряд</span>
+          </div>
           <div class="admin-option-btn" onclick="switchViewMode('3d'); closeAdminPanel();">
             <i class="fa-solid fa-cube" style="color:var(--primary); font-size:16px;"></i>
             <span>3D Cover-Flow карусель</span>
-          </div>
-          <div class="admin-option-btn" onclick="switchViewMode('grid'); closeAdminPanel();">
-            <i class="fa-solid fa-table-cells" style="color:var(--primary); font-size:16px;"></i>
-            <span>▦ Звичайний каталог (Сітка)</span>
           </div>
           <div class="admin-option-btn" onclick="switchViewMode('dual'); closeAdminPanel();">
             <i class="fa-solid fa-bolt" style="color:#2563eb; font-size:16px;"></i>
