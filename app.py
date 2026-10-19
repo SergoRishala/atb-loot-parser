@@ -1477,6 +1477,26 @@ def get_admin_stats():
     stats = load_stats()
     return jsonify({"success": True, "stats": stats})
 
+
+@app.route("/api/admin/stats/set_name", methods=["POST"])
+def set_visitor_name():
+    payload = request.get_json(silent=True) or {}
+    pin = payload.get("pin") or request.args.get("pin")
+    if pin != "7740":
+        return jsonify({"success": False, "error": "Невірний код доступу"}), 403
+    visitor_id = str(payload.get("visitor_id") or "").strip()
+    custom_name = str(payload.get("custom_name") or "").strip()
+    if not visitor_id:
+        return jsonify({"success": False, "error": "Не вказано visitor_id"}), 400
+    
+    stats = load_stats()
+    visitors = stats.setdefault("visitors", {})
+    if visitor_id in visitors:
+        visitors[visitor_id]["custom_name"] = custom_name
+        save_stats(stats)
+        return jsonify({"success": True, "custom_name": custom_name})
+    return jsonify({"success": False, "error": "Користувача не знайдено"}), 404
+
 @app.route("/api/admin/stats/reset", methods=["POST"])
 def reset_admin_stats():
     payload = request.get_json(silent=True) or {}

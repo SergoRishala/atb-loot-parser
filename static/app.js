@@ -862,14 +862,9 @@ function updateCatalogCountDisplay(isLoading, count) {
     }
     headerChip.style.display = 'flex';
 
-    // Запускаємо таймер зникнення (10 сек після останнього оновлення)
-    if (_headerChipTimer) clearTimeout(_headerChipTimer);
-    if (!isLoading) {
-      _headerChipTimer = setTimeout(() => {
-        headerChip.style.opacity = '0';
-        setTimeout(() => { headerChip.style.display = 'none'; headerChip.style.opacity = '1'; }, 500);
-      }, 10000);
-    }
+    // Залишаємо інформацію постійно видимою без зникнення та зсуву кнопок
+    headerChip.style.display = 'flex';
+    headerChip.style.opacity = '1';
   }
 
   // --- Оновлення прихованого внутрішнього тексту (для JS сумісності) ---
@@ -3163,6 +3158,7 @@ window.renderCurrentView = renderCurrentView;
 
 
 
+
 // ═══════════════════════════════════════════
 //   КЛІЄНТСЬКА АНАЛІТИКА ТА АДМІН-ПАНЕЛЬ (7740)
 // ═══════════════════════════════════════════
@@ -3177,13 +3173,119 @@ function getOrCreateVisitorId() {
   return vid;
 }
 
-// --- Збір максимальної інформації про пристрій, браузер та середовище ---
+// --- Визначення моделі телефону за базою кодів (напр. SM-A505 -> Samsung Galaxy A50) ---
+function decodeModelCode(rawModel) {
+  if (!rawModel) return '';
+  const m = rawModel.toUpperCase().trim();
+  
+  // Samsung
+  if (m.includes('SM-A505') || m.includes('SM-A50')) return 'Samsung Galaxy A50';
+  if (m.includes('SM-A515') || m.includes('SM-A51')) return 'Samsung Galaxy A51';
+  if (m.includes('SM-A525') || m.includes('SM-A52')) return 'Samsung Galaxy A52';
+  if (m.includes('SM-A536') || m.includes('SM-A53')) return 'Samsung Galaxy A53 5G';
+  if (m.includes('SM-A546') || m.includes('SM-A54')) return 'Samsung Galaxy A54 5G';
+  if (m.includes('SM-A556') || m.includes('SM-A55')) return 'Samsung Galaxy A55 5G';
+  if (m.includes('SM-A305') || m.includes('SM-A30')) return 'Samsung Galaxy A30';
+  if (m.includes('SM-A315') || m.includes('SM-A31')) return 'Samsung Galaxy A31';
+  if (m.includes('SM-A325') || m.includes('SM-A32')) return 'Samsung Galaxy A32';
+  if (m.includes('SM-A336') || m.includes('SM-A33')) return 'Samsung Galaxy A33';
+  if (m.includes('SM-A346') || m.includes('SM-A34')) return 'Samsung Galaxy A34';
+  if (m.includes('SM-A105') || m.includes('SM-A10')) return 'Samsung Galaxy A10';
+  if (m.includes('SM-A125') || m.includes('SM-A12')) return 'Samsung Galaxy A12';
+  if (m.includes('SM-A135') || m.includes('SM-A13')) return 'Samsung Galaxy A13';
+  if (m.includes('SM-A145') || m.includes('SM-A14')) return 'Samsung Galaxy A14';
+  if (m.includes('SM-A155') || m.includes('SM-A15')) return 'Samsung Galaxy A15';
+  if (m.includes('SM-S901') || m.includes('SM-S90')) return 'Samsung Galaxy S22';
+  if (m.includes('SM-S908')) return 'Samsung Galaxy S22 Ultra';
+  if (m.includes('SM-S911')) return 'Samsung Galaxy S23';
+  if (m.includes('SM-S918')) return 'Samsung Galaxy S23 Ultra';
+  if (m.includes('SM-S921')) return 'Samsung Galaxy S24';
+  if (m.includes('SM-S928')) return 'Samsung Galaxy S24 Ultra';
+  if (m.includes('SM-G973') || m.includes('SM-G97')) return 'Samsung Galaxy S10';
+  if (m.includes('SM-G980') || m.includes('SM-G98')) return 'Samsung Galaxy S20';
+  if (m.includes('SM-G990') || m.includes('SM-G99')) return 'Samsung Galaxy S21';
+  if (m.startsWith('SM-')) return 'Samsung Galaxy (' + rawModel + ')';
+
+  // Xiaomi / Redmi / POCO
+  if (m.includes('2201117') || m.includes('2201116')) return 'Redmi Note 11';
+  if (m.includes('23021RA') || m.includes('23030RA')) return 'Redmi Note 12';
+  if (m.includes('2312DRA') || m.includes('23117RA')) return 'Redmi Note 13';
+  if (m.includes('M2101K6') || m.includes('M2101K7')) return 'Redmi Note 10 Pro';
+  if (m.includes('M2007J20')) return 'POCO X3 NFC';
+  if (m.includes('22011211')) return 'POCO X4 Pro 5G';
+  if (m.includes('23049PCD')) return 'POCO F5';
+  if (m.includes('24069PC')) return 'POCO F6';
+  if (m.includes('REDMI') || m.includes('XIAOMI') || m.includes('POCO')) return rawModel;
+
+  return rawModel;
+}
+
+// --- Визначення моделі iPhone за роздільною здатністю та GPU ---
+function guessIPhoneModel(w, h, ratio) {
+  const minDim = Math.min(w, h);
+  const maxDim = Math.max(w, h);
+  
+  if (minDim === 430 && maxDim === 932) return 'iPhone 14/15/16 Pro Max / Plus';
+  if (minDim === 393 && maxDim === 852) return 'iPhone 14/15/16 Pro / iPhone 15';
+  if (minDim === 428 && maxDim === 926) return 'iPhone 12/13 Pro Max / 14 Plus';
+  if (minDim === 390 && maxDim === 844) return 'iPhone 12 / 12 Pro / 13 / 13 Pro / 14';
+  if (minDim === 414 && maxDim === 896) return 'iPhone 11 / XR / XS Max';
+  if (minDim === 375 && maxDim === 812) return 'iPhone X / XS / 11 Pro / 12 mini / 13 mini';
+  if (minDim === 414 && maxDim === 736) return 'iPhone 6+/7+/8+';
+  if (minDim === 375 && maxDim === 667) return 'iPhone 6/7/8 / SE (2nd/3rd gen)';
+  return 'Apple iPhone';
+}
+
+// --- Збір GPU відеочіпа через WebGL ---
+function getGpuRenderer() {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        return gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '';
+      }
+    }
+  } catch (e) {}
+  return '';
+}
+
+// --- Кешовані дані батареї ---
+let _cachedBatteryInfo = '🔋 Завантаження...';
+
+async function updateBatteryStatus() {
+  try {
+    if (navigator.getBattery) {
+      const b = await navigator.getBattery();
+      const level = Math.round(b.level * 100);
+      const isCharging = b.charging;
+      _cachedBatteryInfo = `${isCharging ? '⚡ ' : '🔋 '}${level}%${isCharging ? ' (на зарядці)' : ''}`;
+      
+      b.onlevelchange = () => {
+        const lvl = Math.round(b.level * 100);
+        _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${lvl}%${b.charging ? ' (на зарядці)' : ''}`;
+      };
+      b.onchargingchange = () => {
+        const lvl = Math.round(b.level * 100);
+        _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${lvl}%${b.charging ? ' (на зарядці)' : ''}`;
+      };
+    } else {
+      _cachedBatteryInfo = 'Не підтримується браузером';
+    }
+  } catch (e) {
+    _cachedBatteryInfo = 'Недоступно';
+  }
+}
+updateBatteryStatus();
+
+// --- Збір максимально детальних параметрів пристрою ---
 function getDeviceInfo() {
   const ua = navigator.userAgent || '';
   const nav = navigator;
   const scr = window.screen || {};
 
-  // --- ОС ---
+  // 1. ОС
   let os = 'Невідома ОС';
   let osVersion = '';
   if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
@@ -3209,7 +3311,7 @@ function getDeviceInfo() {
     os = 'ChromeOS';
   }
 
-  // --- Браузер ---
+  // 2. Браузер
   let browser = 'Інший браузер';
   let browserVersion = '';
   if (/Edg\//.test(ua)) {
@@ -3219,10 +3321,6 @@ function getDeviceInfo() {
   } else if (/OPR\//.test(ua) || /Opera\//.test(ua)) {
     browser = 'Opera';
     const m = ua.match(/OPR\/([\d.]+)/);
-    if (m) browserVersion = m[1];
-  } else if (/YaBrowser\//.test(ua)) {
-    browser = 'Яндекс.Браузер';
-    const m = ua.match(/YaBrowser\/([\d.]+)/);
     if (m) browserVersion = m[1];
   } else if (/SamsungBrowser\//.test(ua)) {
     browser = 'Samsung Internet';
@@ -3246,96 +3344,107 @@ function getDeviceInfo() {
     if (m) browserVersion = m[1];
   }
 
-  // --- Тип пристрою ---
+  // 3. Тип пристрою
   let type = 'Комп\'ютер';
   if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) type = 'Планшет';
   else if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(ua)) type = 'Телефон';
 
-  // --- Розміри екрану vs вікна ---
-  const screenW = scr.width || 0;
-  const screenH = scr.height || 0;
-  const viewportW = window.innerWidth || 0;
-  const viewportH = window.innerHeight || 0;
-  const screenResolution = `${screenW}×${screenH}`;
-  const viewportSize = `${viewportW}×${viewportH}`;
-  const pixelRatio = (window.devicePixelRatio || 1).toFixed(1);
+  // 4. Точна модель пристрою
+  let modelName = '';
+  if (os === 'iOS') {
+    modelName = guessIPhoneModel(scr.width, scr.height, window.devicePixelRatio);
+  } else if (os === 'Android') {
+    // Спробувати витягнути з User-Agent (часто є SM-A505FN тощо)
+    const matchModel = ua.match(/;\s*([^;]+)\s+Build\//i) || ua.match(/\(([^;]+);\s*([^;]+);\s*([^;]+)\)/);
+    let raw = matchModel ? (matchModel[1] || matchModel[3] || '') : '';
+    raw = raw.replace(/Linux;\s*U?;\s*Android\s*[\d.]+;?\s*/i, '').trim();
+    if (raw && !raw.includes('Version/')) {
+      modelName = decodeModelCode(raw);
+    }
+    if (!modelName && nav.userAgentData && nav.userAgentData.model) {
+      modelName = decodeModelCode(nav.userAgentData.model);
+    }
+  } else if (os === 'macOS') {
+    modelName = 'Apple Mac';
+  } else if (os === 'Windows') {
+    modelName = 'Windows PC / Ноутбук';
+  }
 
-  // --- Мова та локаль ---
+  if (!modelName) modelName = type;
+
+  // 5. Екран, GPU, Вікно
+  const screenResolution = `${scr.width || 0}×${scr.height || 0}`;
+  const viewportSize = `${window.innerWidth || 0}×${window.innerHeight || 0}`;
+  const pixelRatio = (window.devicePixelRatio || 1).toFixed(1);
+  const gpu = getGpuRenderer();
+
+  // 6. Локаль та часовий пояс
   const lang = nav.language || nav.userLanguage || 'uk';
   const langs = nav.languages ? Array.from(nav.languages).slice(0, 3).join(', ') : lang;
-
-  // --- Часовий пояс ---
   let timezone = 'Невідомо';
   try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) {}
 
-  // --- Колірна схема ---
+  // 7. Тема, з'єднання, батарея
   const darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const colorScheme = darkMode ? 'Темна' : 'Світла';
 
-  // --- Тип підключення ---
   let connection = 'Невідомо';
   try {
     const nc = nav.connection || nav.mozConnection || nav.webkitConnection;
     if (nc) {
-      const effectiveType = nc.effectiveType || '';
-      const typeMap = {'4g':'Швидкий (4G/Wi-Fi)', '3g':'Середній (3G)', '2g':'Повільний (2G)', 'slow-2g':'Дуже повільний'};
-      connection = typeMap[effectiveType] || nc.type || effectiveType || 'Невідомо';
+      const typeMap = {'4g':'Швидкий (4G/Wi-Fi)', '3g':'Середній (3G)', '2g':'Повільний (2G)'};
+      connection = typeMap[nc.effectiveType] || nc.effectiveType || nc.type || 'Невідомо';
       if (nc.downlink) connection += ` ~${nc.downlink}Мбіт/с`;
     }
   } catch(e) {}
 
-  // --- Підтримка сенсорного екрану ---
   const hasTouch = ('ontouchstart' in window) || (nav.maxTouchPoints > 0);
   const touchPoints = nav.maxTouchPoints || 0;
-
-  // --- Бічна панель / видима область ---
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-
-  // --- Пам'ять та ядра (якщо браузер підтримує) ---
-  let deviceMemory = '';
-  let cpuCores = '';
-  try { if (nav.deviceMemory) deviceMemory = `${nav.deviceMemory} GB RAM`; } catch(e) {}
-  try { if (nav.hardwareConcurrency) cpuCores = `${nav.hardwareConcurrency} ядер CPU`; } catch(e) {}
-
-  // --- Реферер (звідки прийшов) ---
-  const referrer = document.referrer || 'Прямий перехід';
-
-  // --- URL-параметри (UTM) ---
-  const urlParams = new URLSearchParams(window.location.search);
-  const utmSource = urlParams.get('utm_source') || '';
-  const utmMedium = urlParams.get('utm_medium') || '';
+  const battery = _cachedBatteryInfo;
 
   return {
-    // Основне
-    type, os, osVersion, browser, browserVersion,
-    // Екран
-    screenResolution, viewportSize, pixelRatio,
-    // Середовище
-    lang, langs, timezone, colorScheme,
-    // Підключення та можливості
-    connection, hasTouch, touchPoints,
-    // Апаратне забезпечення
-    deviceMemory, cpuCores,
-    // Джерело
-    referrer, utmSource, utmMedium,
-    // Режим
-    isStandalone,
-    // Сирий UA (перші 120 символів для дебагу)
+    type,
+    model: modelName,
+    os,
+    osVersion,
+    browser,
+    browserVersion,
+    gpu,
+    screenResolution,
+    viewportSize,
+    pixelRatio,
+    lang,
+    langs,
+    timezone,
+    colorScheme,
+    connection,
+    hasTouch,
+    touchPoints,
+    battery,
+    referrer: document.referrer || 'Прямий перехід',
     ua: ua.substring(0, 120)
   };
 }
 
-// --- Сесійний таймер ---
+// --- Хронометраж сесії ---
 const _sessionStart = Date.now();
 let _sessionSearchCount = 0;
 let _sessionClickCount = 0;
 let _sessionProductsViewed = [];
 
-function getSessionDuration() {
+function getSessionDurationText() {
+  const sec = Math.round((Date.now() - _sessionStart) / 1000);
+  const min = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  if (min === 0) return `${remSec} сек`;
+  return `${min} хв ${remSec} сек`;
+}
+
+function getSessionDurationSeconds() {
   return Math.round((Date.now() - _sessionStart) / 1000);
 }
 
-// --- Відправка події на сервер ---
+// --- Відправка подій на бекенд ---
 function trackAnalyticsEvent(type, data, extra) {
   try {
     const payload = {
@@ -3344,7 +3453,8 @@ function trackAnalyticsEvent(type, data, extra) {
       data: data || '',
       device: getDeviceInfo(),
       session: {
-        duration_sec: getSessionDuration(),
+        duration_sec: getSessionDurationSeconds(),
+        duration_text: getSessionDurationText(),
         searches: _sessionSearchCount,
         clicks: _sessionClickCount,
         products_viewed: _sessionProductsViewed.length
@@ -3365,52 +3475,47 @@ function trackAnalyticsEvent(type, data, extra) {
 }
 window.trackAnalyticsEvent = trackAnalyticsEvent;
 
-// --- Трекінг перегляду товару у каруселі (при перегортанні) ---
-function trackProductView(product) {
-  if (!product) return;
-  const key = product.link || product.title;
-  if (!_sessionProductsViewed.includes(key)) {
-    _sessionProductsViewed.push(key);
-    trackAnalyticsEvent('product_view', product.title, {
-      store: product.store,
-      price: product.price,
-      discount: product.discount_percent
-    });
-  }
-}
-
-// --- Сесійна пінг-задача (кожні 90 сек надсилаємо актуальний стан сесії) ---
+// Пінгування активності кожні 60 секунд
 setInterval(() => {
-  if (getSessionDuration() > 30) {
-    trackAnalyticsEvent('session_ping', `Активна сесія ${Math.round(getSessionDuration() / 60)} хв`);
+  if (getSessionDurationSeconds() > 10) {
+    trackAnalyticsEvent('session_ping', `Сесія триває: ${getSessionDurationText()}`);
   }
-}, 90000);
+}, 60000);
+
 
 // ═══════════════════════════════════════════
-//   АДМІН-ПАНЕЛЬ (КОД 7740): УПРАВЛІННЯ ТА UI
+//   ПОВНОЦІННА АДМІН-СТОРІНКА (КОД 7740)
 // ═══════════════════════════════════════════
 let currentAdminStatsTab = 'summary';
 let currentAdminStatsData = null;
+let currentViewingVisitorId = null; // Для детального перегляду окремого користувача
 
 function openAdminStatsModal() {
   initAudio();
   playTickSound(1);
   triggerHaptics(1, true);
-  const modal = document.getElementById('adminStatsModal');
-  if (modal) {
-    modal.classList.add('active');
+  
+  const page = document.getElementById('adminStatsModal');
+  if (page) {
+    page.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
     loadAdminStats();
   }
 }
 window.openAdminStatsModal = openAdminStatsModal;
 
 function closeAdminStatsModal() {
-  document.getElementById('adminStatsModal')?.classList.remove('active');
+  const page = document.getElementById('adminStatsModal');
+  if (page) {
+    page.style.display = 'none';
+    document.body.style.overflow = '';
+  }
 }
 window.closeAdminStatsModal = closeAdminStatsModal;
 
 function switchAdminStatsTab(tabName) {
   currentAdminStatsTab = tabName;
+  currentViewingVisitorId = null; // Скидаємо картку окремого юзера
   document.querySelectorAll('.admin-stats-nav .pill-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`astTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`)?.classList.add('active');
   if (currentAdminStatsData) renderAdminStatsTab();
@@ -3420,12 +3525,13 @@ window.switchAdminStatsTab = switchAdminStatsTab;
 async function loadAdminStats() {
   const body = document.getElementById('adminStatsBody');
   if (!body) return;
+
   body.innerHTML = `
-    <div style="text-align:center; padding:50px 20px; color:var(--text3);">
-      <div style="font-size:32px; margin-bottom:12px; animation:spin 1s linear infinite; display:inline-block;">⚙️</div>
-      <div style="font-weight:700;">Завантажуємо статистику з stats.json...</div>
-      <div style="font-size:12px; margin-top:4px;">Це займе лише секунду</div>
+    <div style="text-align:center; padding:60px 20px; color:var(--text3);">
+      <div style="font-size:36px; margin-bottom:12px; animation:spin 1s linear infinite; display:inline-block;">⚙️</div>
+      <div style="font-weight:700; font-size:15px;">Завантаження детальної статистики...</div>
     </div>`;
+
   try {
     const res = await fetch('/api/admin/stats?pin=7740');
     const data = await res.json();
@@ -3433,84 +3539,77 @@ async function loadAdminStats() {
       currentAdminStatsData = data.stats;
       renderAdminStatsTab();
     } else {
-      body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--atb-red);font-weight:700;">❌ ${data.error || 'Не вдалося завантажити статистику'}</div>`;
+      body.innerHTML = `<div style="text-align:center;padding:50px;color:var(--atb-red);font-weight:700;">❌ ${data.error || 'Не вдалося завантажити статистику'}</div>`;
     }
   } catch (err) {
-    body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--atb-red);font-weight:700;">❌ Помилка з'єднання із сервером</div>`;
+    body.innerHTML = `<div style="text-align:center;padding:50px;color:var(--atb-red);font-weight:700;">❌ Помилка з'єднання із сервером</div>`;
   }
 }
 window.loadAdminStats = loadAdminStats;
 
-// --- Утилітарні функції для UI ---
-function _adminKpiCard(icon, label, value, sub, color) {
-  return `
-    <div class="ast-kpi-card" style="background:${color}15; border:1.5px solid ${color}40;">
-      <div class="ast-kpi-icon" style="color:${color};">${icon}</div>
-      <div class="ast-kpi-label">${label}</div>
-      <div class="ast-kpi-value" style="color:${color};">${value}</div>
-      ${sub ? `<div class="ast-kpi-sub">${sub}</div>` : ''}
-    </div>`;
+// Встановлення власного імені користувачеві (Сергій айфон тощо)
+async function setVisitorCustomName(vid, currentName) {
+  const newName = prompt(`Введіть власне ім'я для користувача:\n(наприклад: «Сергій iPhone», «Оля Львів»):`, currentName || '');
+  if (newName === null) return;
+  
+  try {
+    const res = await fetch('/api/admin/stats/set_name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '7740', visitor_id: vid, custom_name: newName.trim() })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (currentAdminStatsData && currentAdminStatsData.visitors[vid]) {
+        currentAdminStatsData.visitors[vid].custom_name = newName.trim();
+      }
+      renderAdminStatsTab();
+    } else {
+      alert('Помилка: ' + data.error);
+    }
+  } catch (e) {
+    alert('Помилка збереження імені.');
+  }
 }
+window.setVisitorCustomName = setVisitorCustomName;
 
-function _adminBar(label, value, max, color) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return `
-    <div style="margin-bottom:10px;">
-      <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-bottom:4px;">
-        <span>«${label}»</span>
-        <span style="color:${color || 'var(--primary)'};">${value} раз${value === 1 ? '' : 'и'}</span>
-      </div>
-      <div style="height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-        <div style="width:${pct}%; height:100%; background:${color || 'var(--primary)'}; border-radius:4px; transition:width 0.4s ease;"></div>
-      </div>
-    </div>`;
+// Перегляд персональної аналітики конкретного користувача (Drill-down)
+function viewVisitorDetails(vid) {
+  currentViewingVisitorId = vid;
+  renderAdminStatsTab();
 }
+window.viewVisitorDetails = viewVisitorDetails;
 
-function _deviceIcon(type) {
-  if (type === 'Телефон') return '📱';
-  if (type === 'Планшет') return '📟';
-  return '💻';
+function closeVisitorDetails() {
+  currentViewingVisitorId = null;
+  renderAdminStatsTab();
 }
+window.closeVisitorDetails = closeVisitorDetails;
 
-function _osIcon(os) {
-  const m = {iOS:'🍎', macOS:'🍎', Android:'🤖', Windows:'🪟', Linux:'🐧', ChromeOS:'🌐'};
-  return m[os] || '🖥️';
-}
-
-function _browserIcon(browser) {
-  const m = {Chrome:'🟡', Safari:'🔵', Firefox:'🦊', Edge:'🔷', Opera:'🔴', 'Samsung Internet':'📱', 'Chrome (iOS)':'🟡'};
-  return m[browser] || '🌐';
-}
-
+// Хелпери для форматування
 function _timeAgo(dateStr) {
   if (!dateStr) return '–';
   try {
     const d = new Date(dateStr.replace(' ', 'T'));
     const diff = Math.round((Date.now() - d.getTime()) / 1000);
-    if (diff < 60) return `${diff} сек. тому`;
-    if (diff < 3600) return `${Math.round(diff/60)} хв. тому`;
-    if (diff < 86400) return `${Math.round(diff/3600)} год. тому`;
-    return `${Math.round(diff/86400)} дн. тому`;
+    if (diff < 60) return `${diff} сек тому`;
+    if (diff < 3600) return `${Math.round(diff/60)} хв тому`;
+    if (diff < 86400) return `${Math.round(diff/3600)} год тому`;
+    return `${Math.round(diff/86400)} дн тому`;
   } catch(e) { return dateStr; }
 }
 
-function _eventIcon(type) {
-  const m = {
-    visit: '👁️', search: '🔍', click: '👆',
-    product_view: '🛍️', session_ping: '🔄'
-  };
-  return m[type] || '⚡';
+function _fmtSec(sec) {
+  if (!sec || sec <= 0) return '–';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m === 0) return `${s} сек`;
+  return `${m} хв ${s} сек`;
 }
 
-function _eventColor(type) {
-  const m = {
-    visit: '#3563e9', search: '#ea580c', click: '#9333ea',
-    product_view: '#16a34a', session_ping: '#6b7280'
-  };
-  return m[type] || '#64748b';
-}
-
-// ═══ ГОЛОВНИЙ РЕНДЕРЕР ВКЛАДОК ═══
+// ═══════════════════════════════════════════
+//   ГОЛОВНИЙ РЕНДЕРЕР ВКЛАДОК АДМІН-ПАНЕЛІ
+// ═══════════════════════════════════════════
 function renderAdminStatsTab() {
   const body = document.getElementById('adminStatsBody');
   if (!body || !currentAdminStatsData) return;
@@ -3521,314 +3620,378 @@ function renderAdminStatsTab() {
   const searchQueries = s.search_queries || {};
   const recentEvents = s.recent_events || [];
 
-  // --- Агреговані дані ---
-  const vArr = Object.values(visitors);
-  const totalVisitors = vArr.length;
+  // Якщо відкрито картку конкретного користувача:
+  if (currentViewingVisitorId && visitors[currentViewingVisitorId]) {
+    renderSingleVisitorProfile(currentViewingVisitorId, visitors[currentViewingVisitorId], recentEvents);
+    return;
+  }
 
-  // Підрахунок типів пристроїв і ОС
-  const deviceCounts = {};
-  const osCounts = {};
-  const browserCounts = {};
-  const tzCounts = {};
-  const langCounts = {};
-  const colorSchemeCounts = {};
-  const connCounts = {};
-  let mobileCount = 0, tabletCount = 0, desktopCount = 0;
-  let touchCount = 0;
-  let returningCount = 0;
-  let totalSessionViewed = 0;
-  const allUserSearches = [];
-
-  vArr.forEach(v => {
-    const dev = v.device || {};
-    const t = dev.type || 'Комп\'ютер';
-    if (t === 'Телефон') mobileCount++;
-    else if (t === 'Планшет') tabletCount++;
-    else desktopCount++;
-    if (dev.hasTouch) touchCount++;
-    if ((v.visit_count || 0) > 1) returningCount++;
-    if (v.searches) allUserSearches.push(...v.searches);
-    const tz = dev.timezone || 'Невідомо';
-    tzCounts[tz] = (tzCounts[tz] || 0) + 1;
-    const lang = (dev.lang || 'uk').split('-')[0].toUpperCase();
-    langCounts[lang] = (langCounts[lang] || 0) + 1;
-    const cs = dev.colorScheme || 'Світла';
-    colorSchemeCounts[cs] = (colorSchemeCounts[cs] || 0) + 1;
-    const br = dev.browser || 'Інший';
-    browserCounts[br] = (browserCounts[br] || 0) + 1;
-    const os = dev.os || 'Інша';
-    osCounts[os] = (osCounts[os] || 0) + 1;
-    const conn = dev.connection || 'Невідомо';
-    connCounts[conn.split(' ')[0]] = (connCounts[conn.split(' ')[0]] || 0) + 1;
-  });
-
-  // Топ пошуків
-  const sortedSearches = Object.entries(searchQueries).sort((a,b) => b[1]-a[1]);
-  const maxSearchCount = sortedSearches[0]?.[1] || 1;
-
-  // Останній візит
-  let lastVisit = '–';
-  if (recentEvents.length > 0) lastVisit = recentEvents[0].time || '–';
-
-  // ════════════════════════════════════════
+  // 1. ВКЛАДКА: ЗВЕДЕННЯ
   if (currentAdminStatsTab === 'summary') {
+    const vArr = Object.values(visitors);
+    const totalUsers = vArr.length;
+    let mobileCount = 0, desktopCount = 0;
+    const modelCounts = {};
+
+    vArr.forEach(v => {
+      const dev = v.device || {};
+      if (dev.type === 'Телефон' || dev.type === 'Планшет') mobileCount++;
+      else desktopCount++;
+      const mod = dev.model || dev.type || 'Комп\'ютер';
+      modelCounts[mod] = (modelCounts[mod] || 0) + 1;
+    });
+
+    const sortedSearches = Object.entries(searchQueries).sort((a,b) => b[1]-a[1]);
+    const maxSearchCount = sortedSearches[0]?.[1] || 1;
+
     body.innerHTML = `
-      <!-- KPI КАРТКИ -->
+      <!-- KPI СІТКА -->
       <div class="ast-kpi-grid">
-        ${_adminKpiCard('👥', 'Всього візитів', summary.total_visits || 0, 'відкриттів сторінки', '#16a34a')}
-        ${_adminKpiCard('🧑', 'Унікальних людей', totalVisitors, `${returningCount} повторно заходили`, '#3563e9')}
-        ${_adminKpiCard('🔍', 'Пошукових запитів', summary.total_searches || 0, `${sortedSearches.length} різних слів`, '#ea580c')}
-        ${_adminKpiCard('👆', 'Кліків та дій', summary.total_clicks || 0, 'кнопки, категорії, кошик', '#9333ea')}
-        ${_adminKpiCard('🛍️', 'Товарів переглянуто', recentEvents.filter(e => e.type==='product_view').length, 'разів гортали каруселі', '#0891b2')}
-        ${_adminKpiCard('🕒', 'Останній вхід', lastVisit ? lastVisit.split(' ')[1] || lastVisit : '–', lastVisit ? lastVisit.split(' ')[0] : '', '#6b7280')}
-      </div>
-
-      <div class="ast-two-cols" style="margin-top:16px;">
-        <!-- ПРИСТРОЇ -->
-        <div class="ast-card">
-          <div class="ast-card-title">📱 Тип пристрою</div>
-          ${totalVisitors === 0 ? '<div class="ast-empty">Ще немає відвідувачів</div>' : `
-            <div class="ast-stat-row">
-              <span>📱 Телефони</span><b>${mobileCount} (${Math.round(mobileCount/Math.max(1,totalVisitors)*100)}%)</b>
-            </div>
-            <div class="ast-stat-row">
-              <span>📟 Планшети</span><b>${tabletCount} (${Math.round(tabletCount/Math.max(1,totalVisitors)*100)}%)</b>
-            </div>
-            <div class="ast-stat-row">
-              <span>💻 Комп'ютери</span><b>${desktopCount} (${Math.round(desktopCount/Math.max(1,totalVisitors)*100)}%)</b>
-            </div>
-            <div class="ast-divider"></div>
-            <div class="ast-stat-row">
-              <span>👆 Сенсорний екран</span><b>${touchCount} / ${totalVisitors}</b>
-            </div>
-            <div class="ast-stat-row">
-              <span>🔁 Повторні відвідувачі</span><b>${returningCount}</b>
-            </div>
-          `}
+        <div class="ast-kpi-card" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+          <div class="ast-kpi-icon">👥</div>
+          <div class="ast-kpi-label">Всього візитів</div>
+          <div class="ast-kpi-value" style="color:#15803d;">${summary.total_visits || 0}</div>
+          <div class="ast-kpi-sub">відкриттів сторінки</div>
         </div>
 
-        <!-- ОС та БРАУЗЕРИ -->
-        <div class="ast-card">
-          <div class="ast-card-title">🖥️ Операційні системи</div>
-          ${Object.entries(osCounts).sort((a,b)=>b[1]-a[1]).map(([os,cnt]) =>
-            `<div class="ast-stat-row"><span>${_osIcon(os)} ${os}</span><b>${cnt} люд.</b></div>`
-          ).join('') || '<div class="ast-empty">–</div>'}
-          <div class="ast-divider"></div>
-          <div class="ast-card-title" style="margin-bottom:8px;">🌐 Браузери</div>
-          ${Object.entries(browserCounts).sort((a,b)=>b[1]-a[1]).map(([br,cnt]) =>
-            `<div class="ast-stat-row"><span>${_browserIcon(br)} ${br}</span><b>${cnt} люд.</b></div>`
-          ).join('') || '<div class="ast-empty">–</div>'}
+        <div class="ast-kpi-card" style="background:#eff6ff; border:1px solid #bfdbfe;">
+          <div class="ast-kpi-icon">🧑</div>
+          <div class="ast-kpi-label">Унікальних людей</div>
+          <div class="ast-kpi-value" style="color:#1d4ed8;">${totalUsers}</div>
+          <div class="ast-kpi-sub">окремих пристроїв</div>
+        </div>
+
+        <div class="ast-kpi-card" style="background:#fff7ed; border:1px solid #fed7aa;">
+          <div class="ast-kpi-icon">🔍</div>
+          <div class="ast-kpi-label">Пошуків</div>
+          <div class="ast-kpi-value" style="color:#c2410c;">${summary.total_searches || 0}</div>
+          <div class="ast-kpi-sub">${sortedSearches.length} унікальних слів</div>
+        </div>
+
+        <div class="ast-kpi-card" style="background:#faf5ff; border:1px solid #e9d5ff;">
+          <div class="ast-kpi-icon">👆</div>
+          <div class="ast-kpi-label">Кліків & Дій</div>
+          <div class="ast-kpi-value" style="color:#7e22ce;">${summary.total_clicks || 0}</div>
+          <div class="ast-kpi-sub">кнопки, кошик, категорії</div>
+        </div>
+
+        <div class="ast-kpi-card" style="background:#ecfeff; border:1px solid #a5f3fc;">
+          <div class="ast-kpi-icon">🛍️</div>
+          <div class="ast-kpi-label">Переглядів карток</div>
+          <div class="ast-kpi-value" style="color:#0e7490;">${recentEvents.filter(e => e.type === 'product_view').length}</div>
+          <div class="ast-kpi-sub">разів гортали товари</div>
         </div>
       </div>
 
-      <div class="ast-two-cols" style="margin-top:12px;">
-        <!-- ТОП-10 ЗАПИТІВ -->
+      <!-- ДЕТАЛЬНІ БЛОКИ -->
+      <div class="ast-two-cols" style="margin-top:14px;">
         <div class="ast-card">
-          <div class="ast-card-title">🔥 Топ-10 популярних запитів</div>
-          ${sortedSearches.length === 0
-            ? '<div class="ast-empty">Ще нічого не шукали</div>'
-            : sortedSearches.slice(0,10).map(([q,cnt]) => _adminBar(q, cnt, maxSearchCount)).join('')
-          }
+          <div class="ast-card-title">📱 Моделі пристроїв відвідувачів</div>
+          ${Object.entries(modelCounts).sort((a,b)=>b[1]-a[1]).map(([mod, cnt]) => `
+            <div class="ast-stat-row">
+              <span style="font-weight:700;">📱 ${mod}</span>
+              <span style="background:var(--primary-light); color:var(--primary); font-weight:800; padding:2px 8px; border-radius:10px;">${cnt} люд.</span>
+            </div>
+          `).join('') || '<div class="ast-empty">Ще немає даних</div>'}
         </div>
 
-        <!-- ЧАСОВІ ПОЯСИ ТА МОВИ -->
         <div class="ast-card">
-          <div class="ast-card-title">🌍 Географія (часовий пояс)</div>
-          ${Object.entries(tzCounts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([tz,cnt]) =>
-            `<div class="ast-stat-row"><span style="font-size:11px;">🕐 ${tz}</span><b>${cnt}</b></div>`
-          ).join('') || '<div class="ast-empty">–</div>'}
-          <div class="ast-divider"></div>
-          <div class="ast-card-title" style="margin-bottom:8px;">🗣️ Мови інтерфейсу</div>
-          ${Object.entries(langCounts).sort((a,b)=>b[1]-a[1]).map(([lang,cnt]) =>
-            `<div class="ast-stat-row"><span>${lang}</span><b>${cnt}</b></div>`
-          ).join('') || '<div class="ast-empty">–</div>'}
-          <div class="ast-divider"></div>
-          <div class="ast-stat-row">
-            <span>🌑 Темна тема</span>
-            <b>${colorSchemeCounts['Темна'] || 0}</b>
-          </div>
-          <div class="ast-stat-row">
-            <span>☀️ Світла тема</span>
-            <b>${colorSchemeCounts['Світла'] || 0}</b>
-          </div>
+          <div class="ast-card-title">🔥 Топ-5 популярних запитів</div>
+          ${sortedSearches.slice(0, 5).map(([q, cnt], i) => `
+            <div style="margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-bottom:2px;">
+                <span>#${i+1} «${q}»</span>
+                <span style="color:var(--primary);">${cnt}×</span>
+              </div>
+              <div style="height:6px; background:#e2e8f0; border-radius:3px;">
+                <div style="width:${Math.round(cnt/maxSearchCount*100)}%; height:100%; background:var(--primary); border-radius:3px;"></div>
+              </div>
+            </div>
+          `).join('') || '<div class="ast-empty">Ще нічого не шукали</div>'}
         </div>
       </div>
     `;
 
-  // ════════════════════════════════════════
+  // 2. ВКЛАДКА: КОРИСТУВАЧІ ТА ЇХНІ ПРОФІЛІ
+  } else if (currentAdminStatsTab === 'visitors') {
+    const vList = Object.entries(visitors).sort((a,b) => (b[1].visit_count||0) - (a[1].visit_count||0));
+
+    body.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+        <div style="font-size:15px; font-weight:800;">Унікальні відвідувачі (${vList.length})</div>
+        <div style="font-size:12px; color:var(--text3);">Натисніть на користувача, щоб переглянути його повну історію дій та теплову карту</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${vList.map(([id, info], idx) => {
+          const dev = info.device || {};
+          const customName = info.custom_name ? `🏷️ <b>${info.custom_name}</b>` : `Користувач #${idx+1}`;
+          const modelTitle = dev.model || `${dev.type || 'Пристрій'} (${dev.os || ''})`;
+          const battery = dev.battery || '';
+          const searches = info.searches || [];
+
+          return `
+            <div class="ast-visitor-card">
+              <div class="ast-visitor-header">
+                <div>
+                  <div style="font-size:15px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px;">
+                    <span>${customName}</span>
+                    <button class="user-edit-name-btn" onclick="setVisitorCustomName('${id}', '${info.custom_name || ''}')" title="Змінити або дати ім'я (наприклад: Сергій айфон)">✏️ Дати ім'я</button>
+                  </div>
+                  <div style="font-size:11px; font-family:monospace; color:var(--text3); margin-top:2px;">ID: ${id}</div>
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <span class="ast-visit-badge">${info.visit_count || 1} візит(ів)</span>
+                  <button class="user-drilldown-btn" onclick="viewVisitorDetails('${id}')">
+                    Аналітика користувача 🔍
+                  </button>
+                </div>
+              </div>
+
+              <!-- Швидкі характеристики -->
+              <div class="ast-visitor-grid">
+                <div class="ast-visitor-field">
+                  <div class="ast-field-label">📱 Модель пристрою</div>
+                  <div class="ast-field-val">${modelTitle}</div>
+                </div>
+                <div class="ast-visitor-field">
+                  <div class="ast-field-label">🔋 Батарея</div>
+                  <div class="ast-field-val">${battery || '–'}</div>
+                </div>
+                <div class="ast-visitor-field">
+                  <div class="ast-field-label">⏱️ Час на сайті</div>
+                  <div class="ast-field-val">${_fmtSec(info.total_session_sec)}</div>
+                </div>
+                <div class="ast-visitor-field">
+                  <div class="ast-field-label">🕒 Останній раз заходив</div>
+                  <div class="ast-field-val">${info.last_seen || '–'} <span style="color:var(--text3); font-size:10px;">(${_timeAgo(info.last_seen)})</span></div>
+                </div>
+                <div class="ast-visitor-field">
+                  <div class="ast-field-label">🌐 IP адреса</div>
+                  <div class="ast-field-val" style="font-family:monospace;">${info.ip || '–'}</div>
+                </div>
+                <div class="ast-visitor-field">
+                  <div class="ast-field-label">📐 Екран / Відеокарта</div>
+                  <div class="ast-field-val" style="font-size:10px;">${dev.screenResolution || ''} • ${dev.gpu ? dev.gpu.split('/')[0] : '–'}</div>
+                </div>
+              </div>
+
+              ${searches.length > 0 ? `
+                <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
+                  <span style="font-size:11px; font-weight:800; color:var(--text3); margin-right:6px;">Шукав(ла):</span>
+                  ${searches.slice(-6).map(s => `<span style="background:#f0f4ff; color:var(--primary); font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; margin:2px; display:inline-block;">«${s}»</span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+  // 3. ВКЛАДКА: ТЕПЛОВА КАРТА & КНОПКИ (HEATMAP)
+  } else if (currentAdminStatsTab === 'heatmap') {
+    // Підраховуємо популярність дій із журналу
+    const clickTargets = {};
+    let totalClicks = 0;
+
+    recentEvents.forEach(ev => {
+      if (ev.type === 'click') {
+        const t = ev.details.replace('Клік: ', '');
+        clickTargets[t] = (clickTargets[t] || 0) + 1;
+        totalClicks++;
+      }
+    });
+
+    const sortedClicks = Object.entries(clickTargets).sort((a,b)=>b[1]-a[1]);
+    const maxClick = sortedClicks[0]?.[1] || 1;
+
+    body.innerHTML = `
+      <div class="heatmap-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <div style="font-size:15px; font-weight:800;">🔥 Теплова карта натискань кнопок та елементів</div>
+            <div style="font-size:12px; color:var(--text3);">Показує, які кнопки, фільтри та категорії натискають найчастіше</div>
+          </div>
+          <span style="background:var(--primary-light); color:var(--primary); font-weight:800; padding:4px 12px; border-radius:12px; font-size:12px;">Всього кліків: ${totalClicks}</span>
+        </div>
+
+        ${sortedClicks.length === 0 ? '<div class="ast-empty" style="padding:40px 0;">Ще немає зареєстрованих кліків</div>' : `
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${sortedClicks.map(([target, count], idx) => {
+              const pct = Math.round((count / maxClick) * 100);
+              let color = '#3563e9';
+              if (idx === 0) color = '#ef4444'; // Топ-1 найгарячіший
+              else if (idx === 1) color = '#ea580c'; // Топ-2
+              else if (idx === 2) color = '#f59e0b'; // Топ-3
+
+              return `
+                <div style="padding:10px 14px; background:#f8fafc; border-radius:12px; border:1px solid var(--border);">
+                  <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:4px;">
+                    <span style="display:flex; align-items:center; gap:6px;">
+                      <span style="width:20px; font-weight:800; color:${color};">#${idx+1}</span>
+                      <span>${target}</span>
+                    </span>
+                    <span style="font-weight:800; color:${color};">${count} раз${count===1?'':'и'}</span>
+                  </div>
+                  <div style="height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                    <div style="width:${pct}%; height:100%; background:${color}; border-radius:4px; transition:width 0.4s ease;"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    `;
+
+  // 4. ВКЛАДКА: ПОШУКОВІ ЗАПИТИ
   } else if (currentAdminStatsTab === 'searches') {
+    const sortedSearches = Object.entries(searchQueries).sort((a,b)=>b[1]-a[1]);
+    const maxSearch = sortedSearches[0]?.[1] || 1;
+
     body.innerHTML = `
       <div class="ast-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-          <div class="ast-card-title" style="margin:0;">Всі пошукові запити (${sortedSearches.length} унікальних)</div>
-          <div style="font-size:12px; color:var(--text3);">Сортування від найпопулярнішого</div>
-        </div>
-        ${sortedSearches.length === 0
-          ? '<div class="ast-empty" style="padding:40px 0;">Ще жодного пошуку не здійснено</div>'
-          : sortedSearches.map(([q,cnt], i) => `
-              <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-radius:10px; margin-bottom:6px;">
-                <div style="width:28px; height:28px; border-radius:8px; background:var(--primary-light); color:var(--primary); font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">#${i+1}</div>
-                <div style="flex:1; min-width:0;">
-                  <div style="font-weight:700; font-size:13px; margin-bottom:3px;">«${q}»</div>
-                  <div style="height:6px; background:#e2e8f0; border-radius:3px;"><div style="width:${Math.round(cnt/maxSearchCount*100)}%; height:100%; background:var(--primary); border-radius:3px;"></div></div>
-                </div>
-                <div style="font-weight:800; color:var(--primary); white-space:nowrap; font-size:13px;">${cnt}×</div>
-              </div>`)
-            .join('')
-        }
-      </div>`;
-
-  // ════════════════════════════════════════
-  } else if (currentAdminStatsTab === 'visitors') {
-    const vList = Object.entries(visitors).sort((a,b)=> (b[1].visit_count||0) - (a[1].visit_count||0));
-    body.innerHTML = `
-      <div class="ast-card" style="margin-bottom:12px;">
-        <div style="display:flex; gap:16px; flex-wrap:wrap;">
-          <div style="text-align:center;"><div style="font-size:22px; font-weight:800; color:var(--primary);">${vList.length}</div><div style="font-size:11px; color:var(--text3);">Унікальних відвідувачів</div></div>
-          <div style="text-align:center;"><div style="font-size:22px; font-weight:800; color:#16a34a;">${returningCount}</div><div style="font-size:11px; color:var(--text3);">Поверталися знову</div></div>
-          <div style="text-align:center;"><div style="font-size:22px; font-weight:800; color:#ea580c;">${vList.length - returningCount}</div><div style="font-size:11px; color:var(--text3);">Нові відвідувачі</div></div>
-        </div>
+        <div style="font-size:15px; font-weight:800; margin-bottom:14px;">Всі пошукові запити користувачів (${sortedSearches.length})</div>
+        ${sortedSearches.length === 0 ? '<div class="ast-empty">Ще нічого не шукали</div>' : `
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            ${sortedSearches.map(([q, cnt], i) => `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#f8fafc; border-radius:10px; border:1px solid var(--border);">
+                <span style="font-weight:700; font-size:13px;"><b>#${i+1}</b> «${q}»</span>
+                <span style="background:var(--primary-light); color:var(--primary); font-weight:800; padding:2px 8px; border-radius:8px;">${cnt}×</span>
+              </div>
+            `).join('')}
+          </div>
+        `}
       </div>
-      ${vList.length === 0
-        ? '<div class="ast-card"><div class="ast-empty" style="padding:40px 0;">Ще немає зареєстрованих відвідувачів</div></div>'
-        : vList.map(([id, info], idx) => {
-            const dev = info.device || {};
-            const searches = info.searches || [];
-            const isReturning = (info.visit_count || 0) > 1;
-            return `
-              <div class="ast-visitor-card">
-                <div class="ast-visitor-header">
-                  <div style="display:flex; align-items:center; gap:10px;">
-                    <div class="ast-visitor-avatar" style="background:${isReturning ? 'var(--primary)' : '#e2e8f0'}; color:${isReturning ? '#fff' : 'var(--text3)'};">
-                      ${_deviceIcon(dev.type || 'Комп\'ютер')}
-                    </div>
-                    <div>
-                      <div style="font-weight:800; font-size:13px;">Відвідувач #${idx+1}${isReturning ? ' <span style="color:var(--primary); font-size:11px;">★ Постійний</span>' : ''}</div>
-                      <div style="font-size:11px; color:var(--text3); font-family:monospace;">${id}</div>
-                    </div>
-                  </div>
-                  <span class="ast-visit-badge">${info.visit_count || 1} візит${(info.visit_count||1) === 1 ? '' : 'и'}</span>
-                </div>
+    `;
 
-                <div class="ast-visitor-grid">
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">📱 Пристрій</div>
-                    <div class="ast-field-val">${_deviceIcon(dev.type)} ${dev.type || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🖥️ ОС</div>
-                    <div class="ast-field-val">${_osIcon(dev.os)} ${dev.os || '–'} ${dev.osVersion || ''}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🌐 Браузер</div>
-                    <div class="ast-field-val">${_browserIcon(dev.browser)} ${dev.browser || '–'} ${dev.browserVersion || ''}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">📐 Екран</div>
-                    <div class="ast-field-val">${dev.screenResolution || '–'} (×${dev.pixelRatio || 1})</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">📏 Вікно браузера</div>
-                    <div class="ast-field-val">${dev.viewportSize || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🌍 Часовий пояс</div>
-                    <div class="ast-field-val">${dev.timezone || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🗣️ Мова системи</div>
-                    <div class="ast-field-val">${dev.langs || dev.lang || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🌑 Кольорова схема</div>
-                    <div class="ast-field-val">${dev.colorScheme || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">📶 З'єднання</div>
-                    <div class="ast-field-val">${dev.connection || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">👆 Тач-екран</div>
-                    <div class="ast-field-val">${dev.hasTouch ? `✅ Так (${dev.touchPoints} точок)` : '❌ Ні'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">💾 Пам'ять / CPU</div>
-                    <div class="ast-field-val">${dev.deviceMemory || '–'} / ${dev.cpuCores || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🌐 IP-адреса</div>
-                    <div class="ast-field-val" style="font-family:monospace;">${info.ip || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🔗 Звідки прийшов</div>
-                    <div class="ast-field-val" style="font-size:11px; word-break:break-all;">${dev.referrer || 'Прямий перехід'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🕒 Перший візит</div>
-                    <div class="ast-field-val">${info.first_seen || '–'}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🕒 Останній візит</div>
-                    <div class="ast-field-val">${info.last_seen || '–'} <span style="color:var(--text3); font-size:11px;">(${_timeAgo(info.last_seen)})</span></div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">🛍️ Переглянуто товарів</div>
-                    <div class="ast-field-val">${info.products_viewed || 0}</div>
-                  </div>
-                  <div class="ast-visitor-field">
-                    <div class="ast-field-label">⏱️ Загальний час на сайті</div>
-                    <div class="ast-field-val">${info.total_session_sec ? Math.round(info.total_session_sec/60) + ' хв' : '–'}</div>
-                  </div>
-                </div>
-
-                ${searches.length > 0 ? `
-                  <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
-                    <div style="font-size:11px; font-weight:800; color:var(--text3); margin-bottom:6px;">🔍 Що шукав(ла) ця людина:</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                      ${searches.map(sq => `<span style="background:#f0f4ff; color:var(--primary); border:1px solid #c7d7f8; border-radius:8px; padding:2px 8px; font-size:12px; font-weight:700;">«${sq}»</span>`).join('')}
-                    </div>
-                  </div>` : ''}
-              </div>`;
-          }).join('')
-      }`;
-
-  // ════════════════════════════════════════
+  // 5. ВКЛАДКА: ЖИВИЙ ЖУРНАЛ ДІЙ
   } else if (currentAdminStatsTab === 'live') {
     body.innerHTML = `
       <div class="ast-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-          <div class="ast-card-title" style="margin:0;">⚡ Хронологічний журнал подій (${recentEvents.length} записів)</div>
-          <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--green); font-weight:700;">
-            <div style="width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse-green 1.5s infinite;"></div>
-            LIVE — оновлюється при кожному запиті
-          </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div style="font-size:15px; font-weight:800;">⚡ Хронологічний журнал дій (LIVE)</div>
+          <span style="font-size:12px; color:var(--green); font-weight:800;">● Оновлюється в реальному часі</span>
         </div>
-        ${recentEvents.length === 0
-          ? '<div class="ast-empty" style="padding:40px 0;">Ще немає зареєстрованих подій</div>'
-          : recentEvents.map(ev => `
-              <div class="ast-event-row">
-                <div class="ast-event-icon" style="background:${_eventColor(ev.type)}20; color:${_eventColor(ev.type)};">${_eventIcon(ev.type)}</div>
-                <div style="flex:1; min-width:0;">
-                  <div style="font-weight:700; font-size:13px; color:var(--text); margin-bottom:2px;">${ev.details}</div>
-                  <div style="font-size:11px; color:var(--text3); display:flex; gap:10px; flex-wrap:wrap;">
-                    <span>📱 ${ev.device || '–'}</span>
-                    <span>🌐 IP: <b style="font-family:monospace;">${ev.ip || '–'}</b></span>
-                    ${ev.visitor_id ? `<span>🆔 ${ev.visitor_id.substring(0,14)}...</span>` : ''}
-                  </div>
+
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${recentEvents.map(ev => `
+            <div class="ast-event-row">
+              <div class="ast-event-icon" style="background:#3563e915; color:#3563e9;">${_eventIcon(ev.type)}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:13px; color:var(--text);">${ev.details}</div>
+                <div style="font-size:11px; color:var(--text3); margin-top:2px;">
+                  📱 ${ev.device || '–'} • 🌐 IP: ${ev.ip || '–'}
                 </div>
-                <div style="text-align:right; flex-shrink:0;">
-                  <div style="font-size:11px; font-family:monospace; color:var(--text3); white-space:nowrap;">${(ev.time || '').split(' ')[1] || ev.time || ''}</div>
-                  <div style="font-size:10px; color:var(--text3);">${(ev.time || '').split(' ')[0] || ''}</div>
-                  <div style="font-size:10px; background:${_eventColor(ev.type)}15; color:${_eventColor(ev.type)}; padding:1px 6px; border-radius:6px; font-weight:700; margin-top:2px;">${ev.type}</div>
-                </div>
-              </div>`).join('')
-        }
-      </div>`;
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:11px; font-family:monospace; color:var(--text2); font-weight:700;">${(ev.time || '').split(' ')[1] || ev.time}</div>
+                <div style="font-size:10px; color:var(--text3);">${(ev.time || '').split(' ')[0] || ''}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
 }
 
+// ═══════════════════════════════════════════
+//   ПЕРСОНАЛЬНИЙ ПРОФІЛЬ КОНКРЕТНОГО КОРИСТУВАЧА
+// ═══════════════════════════════════════════
+function renderSingleVisitorProfile(vid, info, allEvents) {
+  const body = document.getElementById('adminStatsBody');
+  if (!body) return;
+
+  const dev = info.device || {};
+  const userEvents = allEvents.filter(e => e.visitor_id === vid);
+  const customName = info.custom_name ? `«${info.custom_name}»` : vid;
+
+  body.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <button class="pill-btn" onclick="closeVisitorDetails()" style="display:inline-flex; align-items:center; gap:6px;">
+        ← Назад до списку всіх користувачів
+      </button>
+    </div>
+
+    <div class="ast-card" style="margin-bottom:14px; background:linear-gradient(135deg, #f8fafc, #edf2f7);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div style="font-size:18px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px;">
+            <span>👤 ${customName}</span>
+            <button class="user-edit-name-btn" onclick="setVisitorCustomName('${vid}', '${info.custom_name || ''}')">✏️ Змінити ім'я</button>
+          </div>
+          <div style="font-size:12px; font-family:monospace; color:var(--text3); margin-top:2px;">ID: ${vid}</div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <span style="background:var(--primary); color:#fff; font-weight:800; font-size:12px; padding:4px 12px; border-radius:12px;">
+            ${info.visit_count || 1} візитів
+          </span>
+          <span style="background:#16a34a; color:#fff; font-weight:800; font-size:12px; padding:4px 12px; border-radius:12px;">
+            Час на сайті: ${_fmtSec(info.total_session_sec)}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Детальна таблиця пристрою користувача -->
+    <div class="ast-card" style="margin-bottom:14px;">
+      <div class="ast-card-title">📱 Повні характеристики пристрою</div>
+      <div class="ast-visitor-grid">
+        <div class="ast-visitor-field"><div class="ast-field-label">Модель телефону / ПК</div><div class="ast-field-val">${dev.model || dev.type || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Батарея пристрою</div><div class="ast-field-val">${dev.battery || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Операційна система</div><div class="ast-field-val">${dev.os || '–'} ${dev.osVersion || ''}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Браузер</div><div class="ast-field-val">${dev.browser || '–'} ${dev.browserVersion || ''}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Роздільна здатність екрана</div><div class="ast-field-val">${dev.screenResolution || '–'} (×${dev.pixelRatio || 1})</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Відеокарта (GPU)</div><div class="ast-field-val" style="font-size:10px;">${dev.gpu || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">IP адреса</div><div class="ast-field-val" style="font-family:monospace;">${info.ip || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Часовий пояс & Мова</div><div class="ast-field-val">${dev.timezone || '–'} • ${dev.lang || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Тип інтернет-з'єднання</div><div class="ast-field-val">${dev.connection || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Сенсорний екран</div><div class="ast-field-val">${dev.hasTouch ? `Так (${dev.touchPoints} точок)` : 'Ні'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Перший візит</div><div class="ast-field-val">${info.first_seen || '–'}</div></div>
+        <div class="ast-visitor-field"><div class="ast-field-label">Останній вхід</div><div class="ast-field-val">${info.last_seen || '–'} (${_timeAgo(info.last_seen)})</div></div>
+      </div>
+    </div>
+
+    <!-- Що саме шукала ця людина -->
+    <div class="ast-card" style="margin-bottom:14px;">
+      <div class="ast-card-title">🔍 Що шукав саме цей користувач</div>
+      ${(info.searches || []).length === 0 ? '<div class="ast-empty">Користувач не робив текстових пошуків</div>' : `
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+          ${(info.searches || []).map(s => `<span style="background:var(--primary-light); color:var(--primary); font-size:13px; font-weight:800; padding:4px 10px; border-radius:8px;">«${s}»</span>`).join('')}
+        </div>
+      `}
+    </div>
+
+    <!-- Повна хронологія дій саме цього користувача -->
+    <div class="ast-card">
+      <div class="ast-card-title">⚡ Всі зареєстровані дії цього користувача (${userEvents.length})</div>
+      ${userEvents.length === 0 ? '<div class="ast-empty">Немає записів останніх дій</div>' : `
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${userEvents.map(ev => `
+            <div class="ast-event-row">
+              <div class="ast-event-icon" style="background:#3563e915; color:#3563e9;">${_eventIcon(ev.type)}</div>
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:13px;">${ev.details}</div>
+              </div>
+              <div style="font-size:11px; font-family:monospace; color:var(--text3);">${ev.time}</div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function _eventIcon(type) {
+  const m = { visit: '👁️', search: '🔍', click: '👆', product_view: '🛍️', session_ping: '⏱️' };
+  return m[type] || '⚡';
+}
+
 async function resetAdminStats() {
-  if (!confirm('Ви впевнені, що хочете повністю очистити всю статистику відвідувачів, запитів та журнал подій? Цю дію неможливо скасувати.')) return;
+  if (!confirm('Ви впевнені, що хочете повністю очистити статистику?')) return;
   try {
     const res = await fetch('/api/admin/stats/reset', {
       method: 'POST',
@@ -3837,13 +4000,12 @@ async function resetAdminStats() {
     });
     const data = await res.json();
     if (data.success) {
-      currentAdminStatsData = null;
       loadAdminStats();
     } else {
       alert('Помилка: ' + data.error);
     }
   } catch (e) {
-    alert('Помилка з\'єднання при очищенні статистики.');
+    alert('Помилка з\'єднання.');
   }
 }
 window.resetAdminStats = resetAdminStats;
