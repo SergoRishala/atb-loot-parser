@@ -858,6 +858,57 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=2.8"></script>
+
+<!-- 7. МОДАЛЬНЕ ВІКНО СТАТИСТИКИ АДМІНА (КОД 7740) -->
+<div class="modal" id="adminStatsModal">
+  <div class="modal-content" style="max-width: 860px; max-height: 90vh; display: flex; flex-direction: column;">
+    <div class="modal-header-row" style="margin-bottom: 12px;">
+      <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+        <i class="fa-solid fa-chart-line" style="color:var(--primary);"></i>
+        <span>Аналітика & Статистика (Адмін 7740)</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="pill-btn" style="padding:6px 10px; font-size:12px;" onclick="loadAdminStats()" title="Оновити дані">
+          <i class="fa-solid fa-arrows-rotate"></i> Оновити
+        </button>
+        <button class="modal-close-icon" onclick="closeAdminStatsModal()">✕</button>
+      </div>
+    </div>
+
+    <!-- Вкладки підрозділів адмінки -->
+    <div class="admin-stats-nav" style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+      <button class="pill-btn active" id="astTabSummary" onclick="switchAdminStatsTab('summary')">📊 Зведення</button>
+      <button class="pill-btn" id="astTabSearches" onclick="switchAdminStatsTab('searches')">🔍 Пошук & Запити</button>
+      <button class="pill-btn" id="astTabVisitors" onclick="switchAdminStatsTab('visitors')">👥 Унікальні відвідувачі</button>
+      <button class="pill-btn" id="astTabLive" onclick="switchAdminStatsTab('live')">⚡ Живий журнал дій</button>
+    </div>
+
+    <!-- Тіло зі скролом -->
+    <div id="adminStatsBody" style="overflow-y: auto; flex: 1; padding-right: 4px;">
+      <!-- Контент динамічно генерується JS -->
+      <div style="text-align:center; padding: 40px; color: var(--text3);">
+        <div class="search-spinner" style="display:inline-block; margin-bottom:8px;"></div>
+        <div>Завантаження статистики із stats.json...</div>
+      </div>
+    </div>
+
+    <!-- Футер адмін-панелі -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; pt-3; border-top: 1px solid var(--border); padding-top: 10px; flex-wrap: wrap; gap: 8px;">
+      <div style="font-size: 11px; color: var(--text3);">
+        Дані зберігаються в <b>stats.json</b> • Оновлення в реальному часі
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <a href="/api/admin/stats/download?pin=7740" target="_blank" class="pill-btn" style="text-decoration:none; color:var(--text); font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+          <i class="fa-solid fa-download"></i> Завантажити stats.json
+        </a>
+        <button class="pill-btn" style="color:var(--atb-red); border-color:var(--atb-red-bg); font-size:12px;" onclick="resetAdminStats()">
+          <i class="fa-solid fa-trash-can"></i> Скинути статистику
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js?v=3.0"></script>
 </body>
 </html>

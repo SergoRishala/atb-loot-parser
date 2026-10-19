@@ -1286,6 +1286,218 @@ def oauth_callback():
         return f"<h3>Не вдалося отримати токен MCP: {e}</h3><p><a href='/'>Повернутись</a></p>"
 
 
+
+
+# ═══════════════════════════════════════════
+#   МОДУЛЬ АНАЛІТИКИ ТА СТАТИСТИКИ АДМІНА (7740)
+# ═══════════════════════════════════════════
+STATS_FILE = os.path.join(BASE_DIR, "stats.json")
+TMP_STATS_FILE = "/tmp/stats.json"
+_stats_lock = threading.RLock()
+
+def get_stats_file_path():
+    try:
+        # Перевірка доступності запису в робочу директорію
+        test_file = os.path.join(BASE_DIR, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("1")
+        os.remove(test_file)
+        return STATS_FILE
+    except Exception:
+        return TMP_STATS_FILE
+
+def get_default_stats():
+    return {
+        "summary": {
+            "total_visits": 0,
+            "unique_visitors": 0,
+            "total_searches": 0,
+            "total_clicks": 0
+        },
+        "visitors": {},
+        "search_queries": {},
+        "recent_events": []
+    }
+
+def load_stats():
+    file_path = get_stats_file_path()
+    with _stats_lock:
+        if not os.path.exists(file_path):
+            stats = get_default_stats()
+            save_stats(stats)
+            return stats
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Помилка читання stats.json: {e}")
+            return get_default_stats()
+
+def save_stats(data):
+    file_path = get_stats_file_path()
+    with _stats_lock:
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"Помилка запису в {file_path}: {e}")
+            return False
+
+@app.route("/api/analytics/track", methods=["POST"])
+def track_analytics():
+    try:
+        payload = request.get_json(silent=True) or {}
+        event_type = payload.get("type", "visit") # visit, search, click
+        visitor_id = str(payload.get("visitor_id") or "anon").strip()
+        data_text = str(payload.get("data") or "").strip()
+        device_info = payload.get("device") or {}
+
+        # Час за Києвом (+03:00) / UTC
+        current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+        # Визначення реальної IP адреси
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            ip = forwarded.split(",")[0].strip()
+        else:
+            ip = request.remote_addr or "127.0.0.1"
+
+        stats = load_stats()
+        summary = stats.setdefault("summary", {
+            "total_visits": 0,
+            "unique_visitors": 0,
+            "total_searches": 0,
+            "total_clicks": 0
+        })
+        visitors = stats.setdefault("visitors", {})
+        search_queries = stats.setdefault("search_queries", {})
+        recent_events = stats.setdefault("recent_events", [])
+
+        # Оновлення даних відвідувача
+        if visitor_id not in visitors:
+            visitors[visitor_id] = {
+                "first_seen": current_time,
+                "last_seen": current_time,
+                "visit_count": 0,
+                "ip": ip,
+                "device": device_info,
+                "searches": [],
+                "clicks_count": 0
+            }
+
+        v_record = visitors[visitor_id]
+        v_record["last_seen"] = current_time
+        v_record["ip"] = ip
+        if device_info:
+            v_record["device"] = device_info
+
+        # Зберігаємо сесійну статистику
+        session_info = payload.get("session") or {}
+        v_record["products_viewed"] = v_record.get("products_viewed", 0) + session_info.get("products_viewed", 0)
+        if session_info.get("duration_sec"):
+            v_record["total_session_sec"] = v_record.get("total_session_sec", 0) + session_info["duration_sec"]
+
+        # Обробка конкретної події
+        if event_type == "visit":
+            summary["total_visits"] = summary.get("total_visits", 0) + 1
+            v_record["visit_count"] = v_record.get("visit_count", 0) + 1
+            event_desc = f"Відкрив(ла) сайт"
+
+        elif event_type == "search":
+            if data_text and data_text != "7740":
+                summary["total_searches"] = summary.get("total_searches", 0) + 1
+                clean_q = data_text.strip().lower()
+                search_queries[clean_q] = search_queries.get(clean_q, 0) + 1
+                
+                # Додаємо до історії пошуків цього користувача
+                u_searches = v_record.setdefault("searches", [])
+                if not u_searches or u_searches[-1] != clean_q:
+                    u_searches.append(clean_q)
+                    if len(u_searches) > 50:
+                        v_record["searches"] = u_searches[-50:]
+                event_desc = f"Пошук: «{data_text}»"
+            else:
+                event_desc = "Пошук"
+
+        elif event_type == "click":
+            summary["total_clicks"] = summary.get("total_clicks", 0) + 1
+            v_record["clicks_count"] = v_record.get("clicks_count", 0) + 1
+            event_desc = f"Клік: {data_text}" if data_text else "Клік по елементу"
+
+        elif event_type == "product_view":
+            # Фіксуємо перегляд товару в каруселі
+            v_record["products_viewed"] = v_record.get("products_viewed", 0) + 1
+            event_desc = f"Переглянув товар: {data_text}"
+
+        elif event_type == "session_ping":
+            # Активна сесія — оновлюємо last_seen, не додаємо до журналу
+            event_desc = f"Активна сесія: {data_text}"
+
+        else:
+            event_desc = f"{event_type}: {data_text}"
+
+        # Оновлення кількості унікальних відвідувачів
+        summary["unique_visitors"] = len(visitors)
+
+        # Формування рядка для швидкого опису пристрою
+        dev_summary = ""
+        if device_info:
+            d_type = device_info.get("type", "")
+            d_os = device_info.get("os", "")
+            d_br = device_info.get("browser", "")
+            dev_summary = f"{d_type} • {d_os} ({d_br})".strip(" •")
+        if not dev_summary:
+            dev_summary = request.headers.get("User-Agent", "Невідомий пристрій")[:50]
+
+        # Додавання події до журналу (останні 300 подій; session_ping не записуємо щоб не спамити)
+        if event_type != "session_ping":
+            recent_events.insert(0, {
+                "time": current_time,
+                "visitor_id": visitor_id,
+                "type": event_type,
+                "details": event_desc,
+                "ip": ip,
+                "device": dev_summary
+            })
+        if len(recent_events) > 300:
+            stats["recent_events"] = recent_events[:300]
+
+        save_stats(stats)
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Помилка трекінгу аналітики: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/admin/stats", methods=["GET"])
+def get_admin_stats():
+    pin = request.args.get("pin") or request.headers.get("X-Admin-Pin")
+    if pin != "7740":
+        return jsonify({"success": False, "error": "Невірний код доступу адміна (7740)"}), 403
+    stats = load_stats()
+    return jsonify({"success": True, "stats": stats})
+
+@app.route("/api/admin/stats/reset", methods=["POST"])
+def reset_admin_stats():
+    payload = request.get_json(silent=True) or {}
+    pin = payload.get("pin") or request.args.get("pin")
+    if pin != "7740":
+        return jsonify({"success": False, "error": "Невірний код доступу"}), 403
+    stats = get_default_stats()
+    save_stats(stats)
+    return jsonify({"success": True, "message": "Статистику успішно очищено"})
+
+@app.route("/api/admin/stats/download", methods=["GET"])
+def download_admin_stats():
+    pin = request.args.get("pin")
+    if pin != "7740":
+        return "Доступ заборонено", 403
+    file_path = get_stats_file_path()
+    if not os.path.exists(file_path):
+        save_stats(get_default_stats())
+    return send_file(file_path, as_attachment=True, download_name="stats.json", mimetype="application/json")
+
+
 def open_browser():
     time.sleep(1.2)
     webbrowser.open("http://localhost:5050")
