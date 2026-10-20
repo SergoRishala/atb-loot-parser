@@ -1410,8 +1410,9 @@ def save_stats(data):
 def track_analytics():
     try:
         payload = request.get_json(silent=True) or {}
-        event_type = payload.get("type", "visit") # visit, search, click
-        visitor_id = str(payload.get("visitor_id") or "anon").strip()
+        event_type = payload.get("type", "visit") # visit, search, click, product_view
+        raw_vid = str(payload.get("visitor_id") or "anon").strip()
+        device_fp = str(payload.get("device_fingerprint") or "").strip()
         data_text = str(payload.get("data") or "").strip()
         device_info = payload.get("device") or {}
 
@@ -1425,6 +1426,19 @@ def track_analytics():
         else:
             ip = request.remote_addr or "127.0.0.1"
 
+        # Детектор автоматичних роботів/ботів (наприклад, Vercel preview crawler, Googlebot, Lighthouse)
+        ua_raw = request.headers.get("User-Agent", "")
+        ua_lower = ua_raw.lower()
+        gpu_lower = str(device_info.get("gpu") or "").lower()
+        res_screen = str(device_info.get("screenResolution") or "")
+
+        is_bot = False
+        if ("swiftshader" in gpu_lower or "headless" in ua_lower or "bot" in ua_lower or 
+            "crawl" in ua_lower or "spider" in ua_lower or "lighthouse" in ua_lower or 
+            (res_screen == "800×600" and "google" in gpu_lower) or
+            ip.startswith("13.57.") or ip.startswith("54.") or ip.startswith("34.")):
+            is_bot = True
+
         stats = load_stats()
         summary = stats.setdefault("summary", {
             "total_visits": 0,
@@ -1436,21 +1450,68 @@ def track_analytics():
         search_queries = stats.setdefault("search_queries", {})
         recent_events = stats.setdefault("recent_events", [])
 
-        # Оновлення даних відвідувача
-        if visitor_id not in visitors:
-            visitors[visitor_id] = {
+        # ═══════════════════════════════════════════
+        #   РОЗУМНЕ СКЛЕЮВАННЯ ПРИСТРОЇВ (SMART FINGERPRINT MATCHING)
+        # ═══════════════════════════════════════════
+        target_vid = raw_vid
+
+        if target_vid not in visitors and not is_bot:
+            # 1. Пошук за цифровим відбитком заліза (Device Fingerprint)
+            matched_id = None
+            if device_fp:
+                for vid, vdata in visitors.items():
+                    if vdata.get("device_fingerprint") == device_fp:
+                        matched_id = vid
+                        break
+
+            # 2. Якщо fingerprint не знайдено, перевіряємо ідентичність параметрів заліза + підмережі IP
+            if not matched_id and device_info:
+                cur_screen = device_info.get("screenResolution")
+                cur_gpu = device_info.get("gpu")
+                cur_model = device_info.get("model")
+                cur_tz = device_info.get("timezone")
+
+                ip_parts = ip.split(".")
+                ip_subnet = ".".join(ip_parts[:3]) if len(ip_parts) == 4 else ip
+
+                for vid, vdata in visitors.items():
+                    vdev = vdata.get("device") or {}
+                    vip = vdata.get("ip") or ""
+                    vip_subnet = ".".join(vip.split(".")[:3]) if len(vip.split(".")) == 4 else vip
+
+                    # Суворе порівняння: той самий екран + відеочіп + часовий пояс + підмережа IP/модель
+                    if (cur_screen and cur_screen == vdev.get("screenResolution") and
+                        cur_gpu and cur_gpu == vdev.get("gpu") and
+                        cur_tz and cur_tz == vdev.get("timezone") and
+                        (ip_subnet == vip_subnet or cur_model == vdev.get("model"))):
+                        matched_id = vid
+                        break
+
+            if matched_id:
+                target_vid = matched_id
+
+        # Ініціалізація нового або оновлення існуючого
+        if target_vid not in visitors:
+            visitors[target_vid] = {
                 "first_seen": current_time,
                 "last_seen": current_time,
                 "visit_count": 0,
                 "ip": ip,
+                "device_fingerprint": device_fp,
+                "is_bot": is_bot,
                 "device": device_info,
                 "searches": [],
                 "clicks_count": 0
             }
 
-        v_record = visitors[visitor_id]
+        v_record = visitors[target_vid]
         v_record["last_seen"] = current_time
         v_record["ip"] = ip
+        if device_fp:
+            v_record["device_fingerprint"] = device_fp
+        if is_bot:
+            v_record["is_bot"] = True
+
         if device_info:
             v_record["device"] = device_info
 
@@ -1471,7 +1532,7 @@ def track_analytics():
                 summary["total_searches"] = summary.get("total_searches", 0) + 1
                 clean_q = data_text.strip().lower()
                 search_queries[clean_q] = search_queries.get(clean_q, 0) + 1
-                
+
                 # Додаємо до історії пошуків цього користувача
                 u_searches = v_record.setdefault("searches", [])
                 if not u_searches or u_searches[-1] != clean_q:
@@ -1488,12 +1549,10 @@ def track_analytics():
             event_desc = f"Клік: {data_text}" if data_text else "Клік по елементу"
 
         elif event_type == "product_view":
-            # Фіксуємо перегляд товару в каруселі
             v_record["products_viewed"] = v_record.get("products_viewed", 0) + 1
             event_desc = f"Переглянув товар: {data_text}"
 
         elif event_type == "session_ping":
-            # Активна сесія — оновлюємо last_seen, не додаємо до журналу
             event_desc = f"Активна сесія: {data_text}"
 
         else:
@@ -1505,28 +1564,29 @@ def track_analytics():
         # Формування рядка для швидкого опису пристрою
         dev_summary = ""
         if device_info:
-            d_type = device_info.get("type", "")
-            d_os = device_info.get("os", "")
+            d_mod = device_info.get("model") or device_info.get("type", "")
             d_br = device_info.get("browser", "")
-            dev_summary = f"{d_type} • {d_os} ({d_br})".strip(" •")
+            dev_summary = f"{d_mod} ({d_br})".strip(" •")
         if not dev_summary:
-            dev_summary = request.headers.get("User-Agent", "Невідомий пристрій")[:50]
+            dev_summary = ua_raw[:50]
 
         # Додавання події до журналу (останні 300 подій; session_ping не записуємо щоб не спамити)
         if event_type != "session_ping":
             recent_events.insert(0, {
                 "time": current_time,
-                "visitor_id": visitor_id,
+                "visitor_id": target_vid,
+                "custom_name": v_record.get("custom_name", ""),
                 "type": event_type,
                 "details": event_desc,
                 "ip": ip,
-                "device": dev_summary
+                "device": dev_summary,
+                "is_bot": is_bot
             })
         if len(recent_events) > 300:
             stats["recent_events"] = recent_events[:300]
 
         save_stats(stats)
-        return jsonify({"success": True})
+        return jsonify({"success": True, "canonical_visitor_id": target_vid})
     except Exception as e:
         print(f"Помилка трекінгу аналітики: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1558,6 +1618,72 @@ def set_visitor_name():
         save_stats(stats)
         return jsonify({"success": True, "custom_name": custom_name})
     return jsonify({"success": False, "error": "Користувача не знайдено"}), 404
+
+
+@app.route("/api/admin/stats/delete_visitor", methods=["POST"])
+def delete_visitor():
+    payload = request.get_json(silent=True) or {}
+    pin = payload.get("pin") or request.args.get("pin")
+    if pin != "7740":
+        return jsonify({"success": False, "error": "Невірний код доступу"}), 403
+    vid = str(payload.get("visitor_id") or "").strip()
+    if not vid:
+        return jsonify({"success": False, "error": "Не вказано visitor_id"}), 400
+
+    stats = load_stats()
+    visitors = stats.setdefault("visitors", {})
+    if vid in visitors:
+        del visitors[vid]
+        # Очистити також із журналу останніх подій
+        stats["recent_events"] = [e for e in stats.get("recent_events", []) if e.get("visitor_id") != vid]
+        stats["summary"]["unique_visitors"] = len(visitors)
+        save_stats(stats)
+        return jsonify({"success": True, "message": f"Користувача {vid} видалено"})
+    return jsonify({"success": False, "error": "Користувача не знайдено"}), 404
+
+@app.route("/api/admin/stats/merge_visitors", methods=["POST"])
+def merge_visitors():
+    payload = request.get_json(silent=True) or {}
+    pin = payload.get("pin") or request.args.get("pin")
+    if pin != "7740":
+        return jsonify({"success": False, "error": "Невірний код доступу"}), 403
+    source_vid = str(payload.get("source_id") or "").strip()
+    target_vid = str(payload.get("target_id") or "").strip()
+    if not source_vid or not target_vid or source_vid == target_vid:
+        return jsonify({"success": False, "error": "Некоректні ID для об'єднання"}), 400
+
+    stats = load_stats()
+    visitors = stats.setdefault("visitors", {})
+    if source_vid not in visitors or target_vid not in visitors:
+        return jsonify({"success": False, "error": "Одного з користувачів не знайдено"}), 404
+
+    src = visitors[source_vid]
+    tgt = visitors[target_vid]
+
+    # Зливаємо візити та час
+    tgt["visit_count"] = (tgt.get("visit_count") or 1) + (src.get("visit_count") or 1)
+    tgt["total_session_sec"] = (tgt.get("total_session_sec") or 0) + (src.get("total_session_sec") or 0)
+    tgt["products_viewed"] = (tgt.get("products_viewed") or 0) + (src.get("products_viewed") or 0)
+    tgt["clicks_count"] = (tgt.get("clicks_count") or 0) + (src.get("clicks_count") or 0)
+
+    # Зливаємо історію пошуків (унікальні)
+    existing_searches = set(tgt.get("searches", []))
+    for sq in src.get("searches", []):
+        if sq not in existing_searches:
+            tgt.setdefault("searches", []).append(sq)
+
+    # Переприв'язуємо останні події
+    for ev in stats.get("recent_events", []):
+        if ev.get("visitor_id") == source_vid:
+            ev["visitor_id"] = target_vid
+            if tgt.get("custom_name"):
+                ev["custom_name"] = tgt["custom_name"]
+
+    # Видаляємо дубльований профіль
+    del visitors[source_vid]
+    stats["summary"]["unique_visitors"] = len(visitors)
+    save_stats(stats)
+    return jsonify({"success": True, "message": "Користувачів успішно об'єднано"})
 
 @app.route("/api/admin/stats/reset", methods=["POST"])
 def reset_admin_stats():

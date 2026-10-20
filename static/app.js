@@ -3159,25 +3159,79 @@ window.renderCurrentView = renderCurrentView;
 
 
 
+
 // ═══════════════════════════════════════════
 //   КЛІЄНТСЬКА АНАЛІТИКА ТА АДМІН-ПАНЕЛЬ (7740)
+//   (Ідентифікація без реєстрації: Device Fingerprint + Triple Storage)
 // ═══════════════════════════════════════════
 
-// --- Унікальний ID відвідувача (постійний в localStorage) ---
-function getOrCreateVisitorId() {
-  let vid = localStorage.getItem('loot_visitor_id');
-  if (!vid) {
-    vid = 'usr_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
-    localStorage.setItem('loot_visitor_id', vid);
+// --- Допоміжні функції для стійких Cookies ---
+function getCookie(name) {
+  try {
+    const v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? decodeURIComponent(v[2]) : null;
+  } catch(e) { return null; }
+}
+
+function setCookie(name, val) {
+  try {
+    document.cookie = name + '=' + encodeURIComponent(val) + '; max-age=63072000; path=/; SameSite=Lax';
+  } catch(e) {}
+}
+
+// --- Розрахунок стабільного цифрового відбитка заліза (Device Fingerprint) ---
+function getDeviceFingerprint() {
+  try {
+    const scr = window.screen || {};
+    const nav = navigator || {};
+    const gpu = getGpuRenderer() || '';
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const cores = nav.hardwareConcurrency || 0;
+    const mem = nav.deviceMemory || 0;
+    const touch = nav.maxTouchPoints || 0;
+    const res = `${scr.width}x${scr.height}x${scr.colorDepth || 24}x${window.devicePixelRatio || 1}`;
+
+    const raw = `${res}|${gpu}|${tz}|${cores}|${mem}|${touch}|${nav.platform || ''}`;
+
+    // Стабільний швидкий хеш djb2
+    let hash = 5381;
+    for (let i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) + hash) + raw.charCodeAt(i);
+      hash |= 0;
+    }
+    return 'fp_' + Math.abs(hash).toString(36);
+  } catch(e) {
+    return 'fp_generic';
   }
+}
+
+// --- Надійна ідентифікація користувача без реєстрації ---
+function getOrCreateVisitorId() {
+  // 1. Спроба взяти з localStorage
+  let vid = localStorage.getItem('loot_visitor_id');
+
+  // 2. Якщо немає в localStorage (інкогніто, очищення сховища) — беремо з тривалих cookies
+  if (!vid) {
+    vid = getCookie('loot_vid');
+  }
+
+  // 3. Якщо і в куках немає — створюємо ID на базі відбитка заліза
+  if (!vid) {
+    const fp = getDeviceFingerprint();
+    vid = 'usr_' + fp.replace('fp_', '') + '_' + Math.random().toString(36).substring(2, 7);
+  }
+
+  // Дублюємо в обидва сховища для максимальної стійкості
+  localStorage.setItem('loot_visitor_id', vid);
+  setCookie('loot_vid', vid);
   return vid;
 }
 
-// --- Визначення моделі телефону за базою кодів (напр. SM-A505 -> Samsung Galaxy A50) ---
+// --- Декодування моделі телефону за кодом виробника ---
 function decodeModelCode(rawModel) {
   if (!rawModel) return '';
   const m = rawModel.toUpperCase().trim();
-  
+
   // Samsung
   if (m.includes('SM-A505') || m.includes('SM-A50')) return 'Samsung Galaxy A50';
   if (m.includes('SM-A515') || m.includes('SM-A51')) return 'Samsung Galaxy A51';
@@ -3215,16 +3269,13 @@ function decodeModelCode(rawModel) {
   if (m.includes('22011211')) return 'POCO X4 Pro 5G';
   if (m.includes('23049PCD')) return 'POCO F5';
   if (m.includes('24069PC')) return 'POCO F6';
-  if (m.includes('REDMI') || m.includes('XIAOMI') || m.includes('POCO')) return rawModel;
 
   return rawModel;
 }
 
-// --- Визначення моделі iPhone за роздільною здатністю та GPU ---
 function guessIPhoneModel(w, h, ratio) {
   const minDim = Math.min(w, h);
   const maxDim = Math.max(w, h);
-  
   if (minDim === 430 && maxDim === 932) return 'iPhone 14/15/16 Pro Max / Plus';
   if (minDim === 393 && maxDim === 852) return 'iPhone 14/15/16 Pro / iPhone 15';
   if (minDim === 428 && maxDim === 926) return 'iPhone 12/13 Pro Max / 14 Plus';
@@ -3236,7 +3287,6 @@ function guessIPhoneModel(w, h, ratio) {
   return 'Apple iPhone';
 }
 
-// --- Збір GPU відеочіпа через WebGL ---
 function getGpuRenderer() {
   try {
     const canvas = document.createElement('canvas');
@@ -3251,24 +3301,18 @@ function getGpuRenderer() {
   return '';
 }
 
-// --- Кешовані дані батареї ---
 let _cachedBatteryInfo = '🔋 Завантаження...';
-
 async function updateBatteryStatus() {
   try {
     if (navigator.getBattery) {
       const b = await navigator.getBattery();
       const level = Math.round(b.level * 100);
-      const isCharging = b.charging;
-      _cachedBatteryInfo = `${isCharging ? '⚡ ' : '🔋 '}${level}%${isCharging ? ' (на зарядці)' : ''}`;
-      
+      _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${level}%${b.charging ? ' (на зарядці)' : ''}`;
       b.onlevelchange = () => {
-        const lvl = Math.round(b.level * 100);
-        _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${lvl}%${b.charging ? ' (на зарядці)' : ''}`;
+        _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${Math.round(b.level * 100)}%${b.charging ? ' (на зарядці)' : ''}`;
       };
       b.onchargingchange = () => {
-        const lvl = Math.round(b.level * 100);
-        _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${lvl}%${b.charging ? ' (на зарядці)' : ''}`;
+        _cachedBatteryInfo = `${b.charging ? '⚡ ' : '🔋 '}${Math.round(b.level * 100)}%${b.charging ? ' (на зарядці)' : ''}`;
       };
     } else {
       _cachedBatteryInfo = 'Не підтримується браузером';
@@ -3279,13 +3323,11 @@ async function updateBatteryStatus() {
 }
 updateBatteryStatus();
 
-// --- Збір максимально детальних параметрів пристрою ---
 function getDeviceInfo() {
   const ua = navigator.userAgent || '';
   const nav = navigator;
   const scr = window.screen || {};
 
-  // 1. ОС
   let os = 'Невідома ОС';
   let osVersion = '';
   if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
@@ -3307,11 +3349,8 @@ function getDeviceInfo() {
     if (m) osVersion = m[1].replace(/_/g, '.');
   } else if (/Linux/.test(ua)) {
     os = 'Linux';
-  } else if (/CrOS/.test(ua)) {
-    os = 'ChromeOS';
   }
 
-  // 2. Браузер
   let browser = 'Інший браузер';
   let browserVersion = '';
   if (/Edg\//.test(ua)) {
@@ -3344,47 +3383,38 @@ function getDeviceInfo() {
     if (m) browserVersion = m[1];
   }
 
-  // 3. Тип пристрою
   let type = 'Комп\'ютер';
   if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) type = 'Планшет';
   else if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(ua)) type = 'Телефон';
 
-  // 4. Точна модель пристрою
   let modelName = '';
   if (os === 'iOS') {
     modelName = guessIPhoneModel(scr.width, scr.height, window.devicePixelRatio);
   } else if (os === 'Android') {
-    // Спробувати витягнути з User-Agent (часто є SM-A505FN тощо)
     const matchModel = ua.match(/;\s*([^;]+)\s+Build\//i) || ua.match(/\(([^;]+);\s*([^;]+);\s*([^;]+)\)/);
     let raw = matchModel ? (matchModel[1] || matchModel[3] || '') : '';
     raw = raw.replace(/Linux;\s*U?;\s*Android\s*[\d.]+;?\s*/i, '').trim();
     if (raw && !raw.includes('Version/')) {
       modelName = decodeModelCode(raw);
     }
-    if (!modelName && nav.userAgentData && nav.userAgentData.model) {
-      modelName = decodeModelCode(nav.userAgentData.model);
-    }
   } else if (os === 'macOS') {
     modelName = 'Apple Mac';
   } else if (os === 'Windows') {
-    modelName = 'Windows PC / Ноутбук';
+    modelName = 'Windows PC';
   }
 
   if (!modelName) modelName = type;
 
-  // 5. Екран, GPU, Вікно
   const screenResolution = `${scr.width || 0}×${scr.height || 0}`;
   const viewportSize = `${window.innerWidth || 0}×${window.innerHeight || 0}`;
   const pixelRatio = (window.devicePixelRatio || 1).toFixed(1);
   const gpu = getGpuRenderer();
 
-  // 6. Локаль та часовий пояс
   const lang = nav.language || nav.userLanguage || 'uk';
   const langs = nav.languages ? Array.from(nav.languages).slice(0, 3).join(', ') : lang;
   let timezone = 'Невідомо';
   try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) {}
 
-  // 7. Тема, з'єднання, батарея
   const darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const colorScheme = darkMode ? 'Темна' : 'Світла';
 
@@ -3426,7 +3456,6 @@ function getDeviceInfo() {
   };
 }
 
-// --- Хронометраж сесії ---
 const _sessionStart = Date.now();
 let _sessionSearchCount = 0;
 let _sessionClickCount = 0;
@@ -3444,11 +3473,13 @@ function getSessionDurationSeconds() {
   return Math.round((Date.now() - _sessionStart) / 1000);
 }
 
-// --- Відправка подій на бекенд ---
-function trackAnalyticsEvent(type, data, extra) {
+// --- Відправка подій на сервер із синхронізацією ID ---
+async function trackAnalyticsEvent(type, data, extra) {
   try {
+    const currentVid = getOrCreateVisitorId();
     const payload = {
-      visitor_id: getOrCreateVisitorId(),
+      visitor_id: currentVid,
+      device_fingerprint: getDeviceFingerprint(),
       type,
       data: data || '',
       device: getDeviceInfo(),
@@ -3465,17 +3496,23 @@ function trackAnalyticsEvent(type, data, extra) {
     if (type === 'search') _sessionSearchCount++;
     if (type === 'click') _sessionClickCount++;
 
-    fetch('/api/analytics/track', {
+    const res = await fetch('/api/analytics/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       keepalive: true
-    }).catch(() => {});
+    });
+    
+    // Якщо сервер розпізнав цей самий пристрій як існуючого користувача:
+    const respData = await res.json();
+    if (respData && respData.canonical_visitor_id && respData.canonical_visitor_id !== currentVid) {
+      localStorage.setItem('loot_visitor_id', respData.canonical_visitor_id);
+      setCookie('loot_vid', respData.canonical_visitor_id);
+    }
   } catch (e) {}
 }
 window.trackAnalyticsEvent = trackAnalyticsEvent;
 
-// Пінгування активності кожні 60 секунд
 setInterval(() => {
   if (getSessionDurationSeconds() > 10) {
     trackAnalyticsEvent('session_ping', `Сесія триває: ${getSessionDurationText()}`);
@@ -3488,13 +3525,14 @@ setInterval(() => {
 // ═══════════════════════════════════════════
 let currentAdminStatsTab = 'summary';
 let currentAdminStatsData = null;
-let currentViewingVisitorId = null; // Для детального перегляду окремого користувача
+let currentViewingVisitorId = null;
+let showBotsFilter = false; // За замовчуванням ховаємо ботів
 
 function openAdminStatsModal() {
   initAudio();
   playTickSound(1);
   triggerHaptics(1, true);
-  
+
   const page = document.getElementById('adminStatsModal');
   if (page) {
     page.style.display = 'flex';
@@ -3515,12 +3553,18 @@ window.closeAdminStatsModal = closeAdminStatsModal;
 
 function switchAdminStatsTab(tabName) {
   currentAdminStatsTab = tabName;
-  currentViewingVisitorId = null; // Скидаємо картку окремого юзера
+  currentViewingVisitorId = null;
   document.querySelectorAll('.admin-stats-nav .pill-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`astTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`)?.classList.add('active');
   if (currentAdminStatsData) renderAdminStatsTab();
 }
 window.switchAdminStatsTab = switchAdminStatsTab;
+
+function toggleBotsFilter() {
+  showBotsFilter = !showBotsFilter;
+  renderAdminStatsTab();
+}
+window.toggleBotsFilter = toggleBotsFilter;
 
 async function loadAdminStats() {
   const body = document.getElementById('adminStatsBody');
@@ -3547,11 +3591,11 @@ async function loadAdminStats() {
 }
 window.loadAdminStats = loadAdminStats;
 
-// Встановлення власного імені користувачеві (Сергій айфон тощо)
+// Встановлення власного імені
 async function setVisitorCustomName(vid, currentName) {
-  const newName = prompt(`Введіть власне ім'я для користувача:\n(наприклад: «Сергій iPhone», «Оля Львів»):`, currentName || '');
+  const newName = prompt(`Введіть власне ім'я для користувача:\n(наприклад: «Сергій iPhone», «Оля Самсунг»):`, currentName || '');
   if (newName === null) return;
-  
+
   try {
     const res = await fetch('/api/admin/stats/set_name', {
       method: 'POST',
@@ -3573,7 +3617,82 @@ async function setVisitorCustomName(vid, currentName) {
 }
 window.setVisitorCustomName = setVisitorCustomName;
 
-// Перегляд персональної аналітики конкретного користувача (Drill-down)
+// Видалення користувача або бота
+async function deleteVisitor(vid, customName) {
+  const label = customName ? `«${customName}» (${vid})` : vid;
+  if (!confirm(`Ви дійсно бажаєте видалити запис користувача/бота:\n${label}?`)) return;
+
+  try {
+    const res = await fetch('/api/admin/stats/delete_visitor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '7740', visitor_id: vid })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (currentAdminStatsData && currentAdminStatsData.visitors[vid]) {
+        delete currentAdminStatsData.visitors[vid];
+        currentAdminStatsData.summary.unique_visitors = Object.keys(currentAdminStatsData.visitors).length;
+      }
+      if (currentViewingVisitorId === vid) currentViewingVisitorId = null;
+      renderAdminStatsTab();
+    } else {
+      alert('Помилка: ' + data.error);
+    }
+  } catch(e) {
+    alert('Помилка з\'єднання при видаленні.');
+  }
+}
+window.deleteVisitor = deleteVisitor;
+
+// Об'єднання двох користувачів в один профіль
+async function mergeVisitorPrompt(sourceVid, sourceName) {
+  if (!currentAdminStatsData || !currentAdminStatsData.visitors) return;
+  const visitors = currentAdminStatsData.visitors;
+  
+  const options = Object.entries(visitors)
+    .filter(([id]) => id !== sourceVid)
+    .map(([id, info], i) => `${i+1}. ${info.custom_name ? `«${info.custom_name}»` : id} [${info.device?.model || info.device?.type || ''}]`)
+    .join('\n');
+
+  if (!options) {
+    alert('Немає інших користувачів для об\'єднання.');
+    return;
+  }
+
+  const chosenNum = prompt(`Оберіть номер користувача, В ЯКОГО влити дані з ${sourceName || sourceVid}:\n\n${options}\n\nВведіть номер зі списку:`);
+  if (!chosenNum) return;
+  
+  const idx = parseInt(chosenNum.trim(), 10) - 1;
+  const otherIds = Object.keys(visitors).filter(id => id !== sourceVid);
+  const targetVid = otherIds[idx];
+  
+  if (!targetVid) {
+    alert('Невірний номер користувача.');
+    return;
+  }
+
+  const targetName = visitors[targetVid].custom_name ? `«${visitors[targetVid].custom_name}»` : targetVid;
+  if (!confirm(`Об'єднати всі візити та пошуки з ${sourceName || sourceVid} -> у профіль ${targetName}?`)) return;
+
+  try {
+    const res = await fetch('/api/admin/stats/merge_visitors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '7740', source_id: sourceVid, target_id: targetVid })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadAdminStats();
+    } else {
+      alert('Помилка: ' + data.error);
+    }
+  } catch(e) {
+    alert('Помилка об\'єднання користувачів.');
+  }
+}
+window.mergeVisitorPrompt = mergeVisitorPrompt;
+
 function viewVisitorDetails(vid) {
   currentViewingVisitorId = vid;
   renderAdminStatsTab();
@@ -3586,7 +3705,6 @@ function closeVisitorDetails() {
 }
 window.closeVisitorDetails = closeVisitorDetails;
 
-// Хелпери для форматування
 function _timeAgo(dateStr) {
   if (!dateStr) return '–';
   try {
@@ -3608,7 +3726,7 @@ function _fmtSec(sec) {
 }
 
 // ═══════════════════════════════════════════
-//   ГОЛОВНИЙ РЕНДЕРЕР ВКЛАДОК АДМІН-ПАНЕЛІ
+//   ГОЛОВНИЙ РЕНДЕРЕР СТАТИСТИКИ
 // ═══════════════════════════════════════════
 function renderAdminStatsTab() {
   const body = document.getElementById('adminStatsBody');
@@ -3620,23 +3738,19 @@ function renderAdminStatsTab() {
   const searchQueries = s.search_queries || {};
   const recentEvents = s.recent_events || [];
 
-  // Якщо відкрито картку конкретного користувача:
   if (currentViewingVisitorId && visitors[currentViewingVisitorId]) {
     renderSingleVisitorProfile(currentViewingVisitorId, visitors[currentViewingVisitorId], recentEvents);
     return;
   }
 
-  // 1. ВКЛАДКА: ЗВЕДЕННЯ
+  // 1. ЗВЕДЕННЯ
   if (currentAdminStatsTab === 'summary') {
-    const vArr = Object.values(visitors);
+    const vArr = Object.values(visitors).filter(v => showBotsFilter || !v.is_bot);
     const totalUsers = vArr.length;
-    let mobileCount = 0, desktopCount = 0;
     const modelCounts = {};
 
     vArr.forEach(v => {
       const dev = v.device || {};
-      if (dev.type === 'Телефон' || dev.type === 'Планшет') mobileCount++;
-      else desktopCount++;
       const mod = dev.model || dev.type || 'Комп\'ютер';
       modelCounts[mod] = (modelCounts[mod] || 0) + 1;
     });
@@ -3645,7 +3759,6 @@ function renderAdminStatsTab() {
     const maxSearchCount = sortedSearches[0]?.[1] || 1;
 
     body.innerHTML = `
-      <!-- KPI СІТКА -->
       <div class="ast-kpi-grid">
         <div class="ast-kpi-card" style="background:#f0fdf4; border:1px solid #bbf7d0;">
           <div class="ast-kpi-icon">👥</div>
@@ -3656,16 +3769,16 @@ function renderAdminStatsTab() {
 
         <div class="ast-kpi-card" style="background:#eff6ff; border:1px solid #bfdbfe;">
           <div class="ast-kpi-icon">🧑</div>
-          <div class="ast-kpi-label">Унікальних людей</div>
+          <div class="ast-kpi-label">Людей (пристроїв)</div>
           <div class="ast-kpi-value" style="color:#1d4ed8;">${totalUsers}</div>
-          <div class="ast-kpi-sub">окремих пристроїв</div>
+          <div class="ast-kpi-sub">унікальних за відбитком</div>
         </div>
 
         <div class="ast-kpi-card" style="background:#fff7ed; border:1px solid #fed7aa;">
           <div class="ast-kpi-icon">🔍</div>
           <div class="ast-kpi-label">Пошуків</div>
           <div class="ast-kpi-value" style="color:#c2410c;">${summary.total_searches || 0}</div>
-          <div class="ast-kpi-sub">${sortedSearches.length} унікальних слів</div>
+          <div class="ast-kpi-sub">${sortedSearches.length} різних слів</div>
         </div>
 
         <div class="ast-kpi-card" style="background:#faf5ff; border:1px solid #e9d5ff;">
@@ -3679,11 +3792,10 @@ function renderAdminStatsTab() {
           <div class="ast-kpi-icon">🛍️</div>
           <div class="ast-kpi-label">Переглядів карток</div>
           <div class="ast-kpi-value" style="color:#0e7490;">${recentEvents.filter(e => e.type === 'product_view').length}</div>
-          <div class="ast-kpi-sub">разів гортали товари</div>
+          <div class="ast-kpi-sub">разів гортали карусель</div>
         </div>
       </div>
 
-      <!-- ДЕТАЛЬНІ БЛОКИ -->
       <div class="ast-two-cols" style="margin-top:14px;">
         <div class="ast-card">
           <div class="ast-card-title">📱 Моделі пристроїв відвідувачів</div>
@@ -3712,14 +3824,26 @@ function renderAdminStatsTab() {
       </div>
     `;
 
-  // 2. ВКЛАДКА: КОРИСТУВАЧІ ТА ЇХНІ ПРОФІЛІ
+  // 2. КОРИСТУВАЧІ & ПРОФІЛІ
   } else if (currentAdminStatsTab === 'visitors') {
-    const vList = Object.entries(visitors).sort((a,b) => (b[1].visit_count||0) - (a[1].visit_count||0));
+    let vList = Object.entries(visitors);
+    const botCount = vList.filter(([,info]) => info.is_bot).length;
+    const humanCount = vList.length - botCount;
+
+    if (!showBotsFilter) {
+      vList = vList.filter(([,info]) => !info.is_bot);
+    }
+    vList.sort((a,b) => (b[1].visit_count||0) - (a[1].visit_count||0));
 
     body.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-        <div style="font-size:15px; font-weight:800;">Унікальні відвідувачі (${vList.length})</div>
-        <div style="font-size:12px; color:var(--text3);">Натисніть на користувача, щоб переглянути його повну історію дій та теплову карту</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:15px; font-weight:800;">Унікальні відвідувачі (${vList.length})</span>
+          <button class="pill-btn" style="font-size:11px; padding:3px 10px; background:${showBotsFilter ? '#fef3c7':'#ffffff'};" onclick="toggleBotsFilter()">
+            ${showBotsFilter ? `🤖 Показано ботів (${botCount})` : `👤 Тільки люди (${humanCount}) • Сховано ботів (${botCount})`}
+          </button>
+        </div>
+        <div style="font-size:11px; color:var(--text3);">Ідентифікація за Device Fingerprint + Triple Storage</div>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:10px;">
@@ -3729,27 +3853,37 @@ function renderAdminStatsTab() {
           const modelTitle = dev.model || `${dev.type || 'Пристрій'} (${dev.os || ''})`;
           const battery = dev.battery || '';
           const searches = info.searches || [];
+          const isBot = info.is_bot;
 
           return `
-            <div class="ast-visitor-card">
+            <div class="ast-visitor-card" style="${isBot ? 'opacity:0.75; border-color:#fde047;' : ''}">
               <div class="ast-visitor-header">
                 <div>
-                  <div style="font-size:15px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px;">
+                  <div style="font-size:15px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span>${customName}</span>
-                    <button class="user-edit-name-btn" onclick="setVisitorCustomName('${id}', '${info.custom_name || ''}')" title="Змінити або дати ім'я (наприклад: Сергій айфон)">✏️ Дати ім'я</button>
+                    ${isBot ? '<span style="background:#fef08a; color:#854d0e; font-size:11px; font-weight:800; padding:2px 8px; border-radius:10px;">🤖 БОТ / СКАНЕР</span>' : ''}
+                    <button class="user-edit-name-btn" onclick="setVisitorCustomName('${id}', '${info.custom_name || ''}')" title="Дати ім'я (наприклад: Сергій iPhone)">✏️ Дати ім'я</button>
                   </div>
-                  <div style="font-size:11px; font-family:monospace; color:var(--text3); margin-top:2px;">ID: ${id}</div>
+                  <div style="font-size:11px; font-family:monospace; color:var(--text3); margin-top:2px;">
+                    ID: ${id} • Відбиток: ${info.device_fingerprint || 'fp_auto'}
+                  </div>
                 </div>
 
-                <div style="display:flex; gap:8px; align-items:center;">
+                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                   <span class="ast-visit-badge">${info.visit_count || 1} візит(ів)</span>
                   <button class="user-drilldown-btn" onclick="viewVisitorDetails('${id}')">
-                    Аналітика користувача 🔍
+                    Аналітика 🔍
+                  </button>
+                  <button class="pill-btn" style="padding:6px 10px; font-size:11px;" onclick="mergeVisitorPrompt('${id}', '${info.custom_name || ''}')" title="Злити з іншим існуючим користувачем">
+                    🔗 Об'єднати
+                  </button>
+                  <button class="pill-btn" style="padding:6px 10px; font-size:11px; color:var(--atb-red); border-color:#fee2e2;" onclick="deleteVisitor('${id}', '${info.custom_name || ''}')" title="Видалити запис">
+                    🗑️
                   </button>
                 </div>
               </div>
 
-              <!-- Швидкі характеристики -->
+              <!-- Параметри заліза -->
               <div class="ast-visitor-grid">
                 <div class="ast-visitor-field">
                   <div class="ast-field-label">📱 Модель пристрою</div>
@@ -3764,7 +3898,7 @@ function renderAdminStatsTab() {
                   <div class="ast-field-val">${_fmtSec(info.total_session_sec)}</div>
                 </div>
                 <div class="ast-visitor-field">
-                  <div class="ast-field-label">🕒 Останній раз заходив</div>
+                  <div class="ast-field-label">🕒 Останній вхід</div>
                   <div class="ast-field-val">${info.last_seen || '–'} <span style="color:var(--text3); font-size:10px;">(${_timeAgo(info.last_seen)})</span></div>
                 </div>
                 <div class="ast-visitor-field">
@@ -3789,9 +3923,8 @@ function renderAdminStatsTab() {
       </div>
     `;
 
-  // 3. ВКЛАДКА: ТЕПЛОВА КАРТА & КНОПКИ (HEATMAP)
+  // 3. ТЕПЛОВА КАРТА
   } else if (currentAdminStatsTab === 'heatmap') {
-    // Підраховуємо популярність дій із журналу
     const clickTargets = {};
     let totalClicks = 0;
 
@@ -3821,9 +3954,9 @@ function renderAdminStatsTab() {
             ${sortedClicks.map(([target, count], idx) => {
               const pct = Math.round((count / maxClick) * 100);
               let color = '#3563e9';
-              if (idx === 0) color = '#ef4444'; // Топ-1 найгарячіший
-              else if (idx === 1) color = '#ea580c'; // Топ-2
-              else if (idx === 2) color = '#f59e0b'; // Топ-3
+              if (idx === 0) color = '#ef4444';
+              else if (idx === 1) color = '#ea580c';
+              else if (idx === 2) color = '#f59e0b';
 
               return `
                 <div style="padding:10px 14px; background:#f8fafc; border-radius:12px; border:1px solid var(--border);">
@@ -3845,10 +3978,9 @@ function renderAdminStatsTab() {
       </div>
     `;
 
-  // 4. ВКЛАДКА: ПОШУКОВІ ЗАПИТИ
+  // 4. ПОШУКОВІ ЗАПИТИ
   } else if (currentAdminStatsTab === 'searches') {
     const sortedSearches = Object.entries(searchQueries).sort((a,b)=>b[1]-a[1]);
-    const maxSearch = sortedSearches[0]?.[1] || 1;
 
     body.innerHTML = `
       <div class="ast-card">
@@ -3866,7 +3998,7 @@ function renderAdminStatsTab() {
       </div>
     `;
 
-  // 5. ВКЛАДКА: ЖИВИЙ ЖУРНАЛ ДІЙ
+  // 5. ЖИВИЙ ЖУРНАЛ ДІЙ
   } else if (currentAdminStatsTab === 'live') {
     body.innerHTML = `
       <div class="ast-card">
@@ -3876,21 +4008,24 @@ function renderAdminStatsTab() {
         </div>
 
         <div style="display:flex; flex-direction:column; gap:6px;">
-          ${recentEvents.map(ev => `
-            <div class="ast-event-row">
-              <div class="ast-event-icon" style="background:#3563e915; color:#3563e9;">${_eventIcon(ev.type)}</div>
-              <div style="flex:1; min-width:0;">
-                <div style="font-weight:700; font-size:13px; color:var(--text);">${ev.details}</div>
-                <div style="font-size:11px; color:var(--text3); margin-top:2px;">
-                  📱 ${ev.device || '–'} • 🌐 IP: ${ev.ip || '–'}
+          ${recentEvents.map(ev => {
+            const name = ev.custom_name ? `🏷️ <b>${ev.custom_name}</b>` : (ev.visitor_id ? ev.visitor_id.substring(0,14) : '–');
+            return `
+              <div class="ast-event-row">
+                <div class="ast-event-icon" style="background:#3563e915; color:#3563e9;">${_eventIcon(ev.type)}</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-weight:700; font-size:13px; color:var(--text);">${ev.details}</div>
+                  <div style="font-size:11px; color:var(--text3); margin-top:2px;">
+                    <span>👤 ${name}</span> • <span>📱 ${ev.device || '–'}</span> • <span>🌐 IP: ${ev.ip || '–'}</span>
+                  </div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:11px; font-family:monospace; color:var(--text2); font-weight:700;">${(ev.time || '').split(' ')[1] || ev.time}</div>
+                  <div style="font-size:10px; color:var(--text3);">${(ev.time || '').split(' ')[0] || ''}</div>
                 </div>
               </div>
-              <div style="text-align:right;">
-                <div style="font-size:11px; font-family:monospace; color:var(--text2); font-weight:700;">${(ev.time || '').split(' ')[1] || ev.time}</div>
-                <div style="font-size:10px; color:var(--text3);">${(ev.time || '').split(' ')[0] || ''}</div>
-              </div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -3909,20 +4044,31 @@ function renderSingleVisitorProfile(vid, info, allEvents) {
   const customName = info.custom_name ? `«${info.custom_name}»` : vid;
 
   body.innerHTML = `
-    <div style="margin-bottom:14px;">
+    <div style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <button class="pill-btn" onclick="closeVisitorDetails()" style="display:inline-flex; align-items:center; gap:6px;">
         ← Назад до списку всіх користувачів
       </button>
+
+      <div style="display:flex; gap:6px;">
+        <button class="pill-btn" onclick="mergeVisitorPrompt('${vid}', '${info.custom_name || ''}')">
+          🔗 Об'єднати з іншим
+        </button>
+        <button class="pill-btn" style="color:var(--atb-red); border-color:#fee2e2;" onclick="deleteVisitor('${vid}', '${info.custom_name || ''}')">
+          🗑️ Видалити цей профіль
+        </button>
+      </div>
     </div>
 
     <div class="ast-card" style="margin-bottom:14px; background:linear-gradient(135deg, #f8fafc, #edf2f7);">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
         <div>
-          <div style="font-size:18px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px;">
+          <div style="font-size:18px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span>👤 ${customName}</span>
             <button class="user-edit-name-btn" onclick="setVisitorCustomName('${vid}', '${info.custom_name || ''}')">✏️ Змінити ім'я</button>
           </div>
-          <div style="font-size:12px; font-family:monospace; color:var(--text3); margin-top:2px;">ID: ${vid}</div>
+          <div style="font-size:12px; font-family:monospace; color:var(--text3); margin-top:2px;">
+            ID: ${vid} • Відбиток: ${info.device_fingerprint || 'fp_auto'}
+          </div>
         </div>
 
         <div style="display:flex; gap:8px;">
@@ -3936,9 +4082,9 @@ function renderSingleVisitorProfile(vid, info, allEvents) {
       </div>
     </div>
 
-    <!-- Детальна таблиця пристрою користувача -->
+    <!-- Таблиця пристрою -->
     <div class="ast-card" style="margin-bottom:14px;">
-      <div class="ast-card-title">📱 Повні характеристики пристрою</div>
+      <div class="ast-card-title">📱 Характеристики пристрою</div>
       <div class="ast-visitor-grid">
         <div class="ast-visitor-field"><div class="ast-field-label">Модель телефону / ПК</div><div class="ast-field-val">${dev.model || dev.type || '–'}</div></div>
         <div class="ast-visitor-field"><div class="ast-field-label">Батарея пристрою</div><div class="ast-field-val">${dev.battery || '–'}</div></div>
