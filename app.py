@@ -1290,14 +1290,66 @@ def oauth_callback():
 
 # ═══════════════════════════════════════════
 #   МОДУЛЬ АНАЛІТИКИ ТА СТАТИСТИКИ АДМІНА (7740)
+#   (Підтримка Vercel KV / Upstash Redis + локальний fallback)
 # ═══════════════════════════════════════════
 STATS_FILE = os.path.join(BASE_DIR, "stats.json")
 TMP_STATS_FILE = "/tmp/stats.json"
 _stats_lock = threading.RLock()
 
+REDIS_KV_KEY = "loot_analytics_stats_v1"
+
+def get_kv_credentials():
+    url = (os.environ.get("KV_REST_API_URL") or 
+           os.environ.get("UPSTASH_REDIS_REST_URL") or "").strip()
+    token = (os.environ.get("KV_REST_API_TOKEN") or 
+             os.environ.get("UPSTASH_REDIS_REST_TOKEN") or "").strip()
+    if url and token:
+        return url.rstrip("/"), token
+    return None, None
+
+def kv_redis_get(key):
+    url, token = get_kv_credentials()
+    if not url or not token:
+        return None
+    try:
+        req_url = f"{url}/get/{key}"
+        req = urllib.request.Request(req_url, headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw = data.get("result")
+            if raw:
+                if isinstance(raw, str):
+                    return json.loads(raw)
+                return raw
+    except Exception as e:
+        print(f"Vercel KV Read error ({key}): {e}")
+    return None
+
+def kv_redis_set(key, data_obj):
+    url, token = get_kv_credentials()
+    if not url or not token:
+        return False
+    try:
+        # Використовуємо універсальний POST до Upstash REST API
+        val_str = json.dumps(data_obj, ensure_ascii=False)
+        cmd_payload = json.dumps(["SET", key, val_str]).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=cmd_payload,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            return resp.status in (200, 201)
+    except Exception as e:
+        print(f"Vercel KV Write error ({key}): {e}")
+        return False
+
 def get_stats_file_path():
     try:
-        # Перевірка доступності запису в робочу директорію
         test_file = os.path.join(BASE_DIR, ".write_test")
         with open(test_file, "w") as f:
             f.write("1")
@@ -1320,8 +1372,14 @@ def get_default_stats():
     }
 
 def load_stats():
-    file_path = get_stats_file_path()
     with _stats_lock:
+        # 1. Спроба завантажити з Vercel KV / Upstash Redis
+        kv_data = kv_redis_get(REDIS_KV_KEY)
+        if kv_data and isinstance(kv_data, dict) and "summary" in kv_data:
+            return kv_data
+
+        # 2. Локальний файл fallback
+        file_path = get_stats_file_path()
         if not os.path.exists(file_path):
             stats = get_default_stats()
             save_stats(stats)
@@ -1334,15 +1392,19 @@ def load_stats():
             return get_default_stats()
 
 def save_stats(data):
-    file_path = get_stats_file_path()
     with _stats_lock:
+        # 1. Запис у Vercel KV / Upstash Redis
+        kv_success = kv_redis_set(REDIS_KV_KEY, data)
+
+        # 2. Одночасно зберігаємо у локальний файл/tmp для бекапу
+        file_path = get_stats_file_path()
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             return True
         except Exception as e:
             print(f"Помилка запису в {file_path}: {e}")
-            return False
+            return kv_success
 
 @app.route("/api/analytics/track", methods=["POST"])
 def track_analytics():
@@ -1512,10 +1574,11 @@ def download_admin_stats():
     pin = request.args.get("pin")
     if pin != "7740":
         return "Доступ заборонено", 403
-    file_path = get_stats_file_path()
-    if not os.path.exists(file_path):
-        save_stats(get_default_stats())
-    return send_file(file_path, as_attachment=True, download_name="stats.json", mimetype="application/json")
+    stats = load_stats()
+    buf = io.BytesIO()
+    buf.write(json.dumps(stats, ensure_ascii=False, indent=2).encode("utf-8"))
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="stats.json", mimetype="application/json")
 
 
 def open_browser():
