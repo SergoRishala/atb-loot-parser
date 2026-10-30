@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=5.0"/>
+  <link rel="stylesheet" href="/static/style.css?v=6.0"/>
   <link rel="icon" href="https://silpo.ua/favicon.ico" type="image/x-icon"/>
   <!-- Штрихкод сканер бібліотека -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -331,15 +331,25 @@
       </button>
     </div>
     <div class="filter-dropdown-content">
-      <!-- 1. Магазин -->
+      <!-- 1. Магазини (мульти-вибір) -->
       <div class="filter-group">
-        <div class="filter-section-lbl">🏪 Супермаркет:</div>
+        <div class="filter-section-lbl">🏪 Супермаркети (можна обрати декілька):</div>
         <div class="filter-store-pills">
-          <button class="filter-tag active" id="ftStoreAll" onclick="selectFilterStore('all')">Всі</button>
-          <button class="filter-tag" id="ftStoreAvrora" onclick="selectFilterStore('avrora')">🟡 Аврора</button>
-          <button class="filter-tag" id="ftStoreAtb" onclick="selectFilterStore('atb')">🔴 АТБ</button>
-          <button class="filter-tag" id="ftStoreSilpo" onclick="selectFilterStore('silpo')">🟠 Сільпо</button>
-          <button class="filter-tag" id="ftStoreEva" onclick="selectFilterStore('eva')">🟢 EVA</button>
+          <button class="filter-tag active" id="ftStoreAll" onclick="toggleStoreFilter('all')">Всі</button>
+          <button class="filter-tag" id="ftStoreAvrora" onclick="toggleStoreFilter('avrora')">🟡 Аврора</button>
+          <button class="filter-tag" id="ftStoreAtb" onclick="toggleStoreFilter('atb')">🔴 АТБ</button>
+          <button class="filter-tag" id="ftStoreSilpo" onclick="toggleStoreFilter('silpo')">🟠 Сільпо</button>
+          <button class="filter-tag" id="ftStoreEva" onclick="toggleStoreFilter('eva')">🟢 EVA</button>
+        </div>
+      </div>
+
+      <!-- 1.5. Акції "Тільки онлайн" Сільпо -->
+      <div class="filter-group">
+        <div class="filter-section-lbl">📱 Онлайн-акції Сільпо:</div>
+        <div class="filter-pills-wrap">
+          <button class="filter-pill-chip active" id="ftOnlineHide" onclick="selectOnlinePromoFilter('hide')">Справжня ціна</button>
+          <button class="filter-pill-chip" id="ftOnlineShow" onclick="selectOnlinePromoFilter('show')">З онлайн-знижками</button>
+          <button class="filter-pill-chip" id="ftOnlineOnly" onclick="selectOnlinePromoFilter('only')">📱 Тільки онлайн</button>
         </div>
       </div>
 
@@ -497,13 +507,13 @@
     <div class="admin-panel-body">
       <!-- 1. Фільтр магазину -->
       <div class="admin-group">
-        <div class="admin-group-label">Вибір мережі магазинів</div>
+        <div class="admin-group-label">Вибір мережі магазинів (можна обрати декілька)</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button class="pill-btn active" id="storePillAll" style="flex:1; min-width:70px; justify-content:center;" onclick="setStoreFilter('all')">🛍️ Всі</button>
-          <button class="pill-btn pill-avrora" id="storePillAvrora" style="flex:1; min-width:85px; justify-content:center;" onclick="setStoreFilter('avrora')">🟡 Аврора</button>
-          <button class="pill-btn pill-atb" id="storePillAtb" style="flex:1; min-width:75px; justify-content:center;" onclick="setStoreFilter('atb')">🔴 АТБ</button>
-          <button class="pill-btn pill-silpo" id="storePillSilpo" style="flex:1; min-width:85px; justify-content:center;" onclick="setStoreFilter('silpo')">🟠 Сільпо</button>
-          <button class="pill-btn pill-eva" id="storePillEva" style="flex:1; min-width:75px; justify-content:center;" onclick="setStoreFilter('eva')">🟢 EVA</button>
+          <button class="pill-btn active" id="storePillAll" style="flex:1; min-width:70px; justify-content:center;" onclick="toggleStoreFilter('all')">🛍️ Всі</button>
+          <button class="pill-btn pill-avrora" id="storePillAvrora" style="flex:1; min-width:85px; justify-content:center;" onclick="toggleStoreFilter('avrora')">🟡 Аврора</button>
+          <button class="pill-btn pill-atb" id="storePillAtb" style="flex:1; min-width:75px; justify-content:center;" onclick="toggleStoreFilter('atb')">🔴 АТБ</button>
+          <button class="pill-btn pill-silpo" id="storePillSilpo" style="flex:1; min-width:85px; justify-content:center;" onclick="toggleStoreFilter('silpo')">🟠 Сільпо</button>
+          <button class="pill-btn pill-eva" id="storePillEva" style="flex:1; min-width:75px; justify-content:center;" onclick="toggleStoreFilter('eva')">🟢 EVA</button>
         </div>
       </div>
 
@@ -924,6 +934,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=5.0"></script>
+<script src="/static/app.js?v=6.0"></script>
 </body>
 </html>

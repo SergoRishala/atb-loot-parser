@@ -16,7 +16,9 @@ let showNovaPoshta = false;
 let activeCategory = null; // Поточна обрана категорія
 let currentSearchQuery = ''; // За замовчуванням порожній запит (завантажуються акції Сільпо & АТБ)
 let currentSort = 'discount_desc'; // Сортування за замовчуванням — макс. знижка
-let currentStore = 'all'; // 'all', 'atb', 'silpo'
+let currentStore = 'all'; // 'all', 'atb', 'silpo', 'avrora', 'eva' або декілька через кому
+let selectedStores = new Set(['avrora', 'atb', 'silpo', 'eva']); // Мульти-вибір магазинів
+let filterOnlinePromo = 'hide'; // 'hide' (справжня ціна полиці Сільпо), 'show' (з онлайн акціями), 'only' (тільки онлайн)
 let filterDiscountMin = 0; // 0 = всі, 1 = будь-яка знижка, 20 = >=20%, 30 = >=30%, 50 = >=50%
 let filterPriceRange = 'all'; // 'all', '0-50', '50-100', '100-250', '250+'
 let filterOnlyWithWeight = false; // Тільки з вагою (ціна за 100г/мл)
@@ -744,11 +746,12 @@ async function performSearch(query) {
   try {
     const qs = new URLSearchParams({
       q: query,
-      store: currentStore,
+      store: 'all',
       branch_id: selectedBranchId,
       page: 1,
       limit: 100,
-      sort: currentSort
+      sort: currentSort,
+      online_promo: 'show'
     });
 
     const res = await fetch(`${API}/search?${qs.toString()}`);
@@ -789,17 +792,19 @@ async function startBackgroundLoading(query, seq) {
   updateLoadingBadge(true, "Підтягуються інші товари...");
 
   let page = 2;
-  const maxPages = 15; // До 1500 товарів
+  const maxPages = 20; // До 2000+ товарів
+  let emptyStreak = 0;
 
   while (page <= maxPages && currentSearchSeq === seq) {
     try {
       const qs = new URLSearchParams({
         q: query,
-        store: currentStore,
+        store: 'all',
         branch_id: selectedBranchId,
         page: page,
         limit: 100,
-        sort: currentSort
+        sort: currentSort,
+        online_promo: 'show'
       });
 
       const res = await fetch(`${API}/search?${qs.toString()}`);
@@ -807,7 +812,10 @@ async function startBackgroundLoading(query, seq) {
 
       const data = await res.json();
       if (!data.success || !data.items || data.items.length === 0) {
-        break;
+        emptyStreak++;
+        if (emptyStreak >= 2 || !data.has_more) break;
+        page++;
+        continue;
       }
 
       data.items.forEach(p => {
@@ -819,6 +827,7 @@ async function startBackgroundLoading(query, seq) {
       const newUnique = data.items.filter(p => !existingKeys.has(p.link || p.product_url || p.title));
 
       if (newUnique.length > 0) {
+        emptyStreak = 0;
         allProducts.push(...newUnique);
         // Якщо відкрита карусель — одразу додаємо нові картки
         if (currentViewMode === '3d') {
@@ -831,9 +840,12 @@ async function startBackgroundLoading(query, seq) {
           // Оновлюємо сітку/порівняння без збивання позиції
           applyFiltersAndRender_NoReset();
         }
+      } else {
+        emptyStreak++;
+        if (emptyStreak >= 2) break;
       }
 
-      if (!data.has_more || data.items.length < 15) {
+      if (!data.has_more) {
         break;
       }
 
@@ -1151,9 +1163,53 @@ function applyFiltersAndRender() {
 function applyFiltersAndRender_Core() {
   let filtered = [...allProducts];
 
-  // 1. Фільтр за магазином
-  if (currentStore !== 'all') {
-    filtered = filtered.filter(p => p.store === currentStore);
+  // 0. Точний пошук у лапках/дужках: "old spice", (old spice), «old spice»
+  if (currentSearchQuery) {
+    const qMatches = currentSearchQuery.match(/["“«\(]([^"”»\)]+)["”»\)]/g);
+    let reqWords = [];
+    if (qMatches && qMatches.length > 0) {
+      qMatches.forEach(chunk => {
+        const clean = chunk.replace(/["“«»”\(\)]/g, '').trim().toLowerCase();
+        clean.split(/\s+/).forEach(w => { if (w) reqWords.push(w); });
+      });
+    } else if (currentSearchQuery.startsWith('"') && currentSearchQuery.endsWith('"') && currentSearchQuery.length > 2) {
+      reqWords = currentSearchQuery.slice(1, -1).trim().toLowerCase().split(/\s+/).filter(Boolean);
+    }
+
+    if (reqWords.length > 0) {
+      filtered = filtered.filter(p => {
+        const titleLower = (p.title || '').toLowerCase();
+        return reqWords.every(w => titleLower.includes(w));
+      });
+    }
+  }
+
+  // 1. Фільтр за магазинами (мульти-вибір)
+  if (selectedStores && selectedStores.size > 0 && selectedStores.size < 4) {
+    filtered = filtered.filter(p => selectedStores.has(p.store));
+  }
+
+  // 1.5. Фільтр "Тільки онлайн" Сільпо
+  if (filterOnlinePromo === 'only') {
+    filtered = filtered.filter(p => p.store === 'silpo' && p.is_only_online);
+  } else if (filterOnlinePromo === 'hide') {
+    // Показуємо справжню поличну ціну без онлайн-знижки
+    filtered = filtered.map(p => {
+      if (p.store === 'silpo' && p.is_only_online) {
+        const realPrice = p.shelf_price || p.old_price;
+        if (realPrice) {
+          return {
+            ...p,
+            price: realPrice,
+            old_price: null,
+            has_discount: false,
+            discount_percent: null,
+            saving: 0
+          };
+        }
+      }
+      return p;
+    });
   }
 
   // 2. Фільтр за розміром знижки
@@ -1240,43 +1296,86 @@ function applyFiltersAndRender_Core() {
 
 }
 
-function setStoreFilter(store) {
-  selectFilterStore(store);
-}
-
-function selectFilterStore(store) {
+function toggleStoreFilter(store) {
   initAudio();
   playTickSound(1);
   triggerHaptics(1, true);
 
-  currentStore = store;
-  trackAnalyticsEvent('click', `Фільтр магазину: ${store}`);
-  
-  // Оновлення тегів у випадаючому меню фільтрів
-  document.querySelectorAll('.filter-store-pills .filter-tag').forEach(b => {
-    b.classList.remove('active');
-  });
-  if (store === 'all') document.getElementById('ftStoreAll')?.classList.add('active');
-  else if (store === 'avrora') document.getElementById('ftStoreAvrora')?.classList.add('active');
-  else if (store === 'atb') document.getElementById('ftStoreAtb')?.classList.add('active');
-  else if (store === 'silpo') document.getElementById('ftStoreSilpo')?.classList.add('active');
-  else if (store === 'eva') document.getElementById('ftStoreEva')?.classList.add('active');
+  if (store === 'all') {
+    selectedStores = new Set(['avrora', 'atb', 'silpo', 'eva']);
+    currentStore = 'all';
+  } else {
+    if (selectedStores.size === 4) {
+      // Якщо були обрані всі 4 — клік по конкретному залишає тільки його
+      selectedStores = new Set([store]);
+      currentStore = store;
+    } else if (selectedStores.has(store)) {
+      selectedStores.delete(store);
+      // Якщо зняли останній — повертаємо всі
+      if (selectedStores.size === 0) {
+        selectedStores = new Set(['avrora', 'atb', 'silpo', 'eva']);
+        currentStore = 'all';
+      } else if (selectedStores.size === 1) {
+        currentStore = Array.from(selectedStores)[0];
+      } else {
+        currentStore = Array.from(selectedStores).join(',');
+      }
+    } else {
+      selectedStores.add(store);
+      if (selectedStores.size === 4) {
+        currentStore = 'all';
+      } else {
+        currentStore = Array.from(selectedStores).join(',');
+      }
+    }
+  }
 
-  // Оновлення швидких кнопок магазинів
-  document.querySelectorAll('.quick-action-pills .pill-btn, .admin-group .pill-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-  if (store === 'all') document.getElementById('storePillAll')?.classList.add('active');
-  else if (store === 'avrora') document.getElementById('storePillAvrora')?.classList.add('active');
-  else if (store === 'atb') document.getElementById('storePillAtb')?.classList.add('active');
-  else if (store === 'silpo') document.getElementById('storePillSilpo')?.classList.add('active');
-  else if (store === 'eva') document.getElementById('storePillEva')?.classList.add('active');
-
+  trackAnalyticsEvent('click', `Фільтр магазинів: ${Array.from(selectedStores).join(',')}`);
+  updateStoreFilterUI();
   updateFilterButtonState();
   applyFiltersAndRender();
 }
-window.selectFilterStore = selectFilterStore;
-window.setStoreFilter = setStoreFilter;
+window.toggleStoreFilter = toggleStoreFilter;
+window.selectFilterStore = toggleStoreFilter;
+window.setStoreFilter = toggleStoreFilter;
+
+function updateStoreFilterUI() {
+  const isAll = selectedStores.size === 4;
+
+  // Оновлення тегів у випадаючому меню фільтрів
+  document.getElementById('ftStoreAll')?.classList.toggle('active', isAll);
+  document.getElementById('ftStoreAvrora')?.classList.toggle('active', !isAll && selectedStores.has('avrora'));
+  document.getElementById('ftStoreAtb')?.classList.toggle('active', !isAll && selectedStores.has('atb'));
+  document.getElementById('ftStoreSilpo')?.classList.toggle('active', !isAll && selectedStores.has('silpo'));
+  document.getElementById('ftStoreEva')?.classList.toggle('active', !isAll && selectedStores.has('eva'));
+
+  // Оновлення швидких кнопок магазинів (в адмінці/налаштуваннях)
+  document.getElementById('storePillAll')?.classList.toggle('active', isAll);
+  document.getElementById('storePillAvrora')?.classList.toggle('active', !isAll && selectedStores.has('avrora'));
+  document.getElementById('storePillAtb')?.classList.toggle('active', !isAll && selectedStores.has('atb'));
+  document.getElementById('storePillSilpo')?.classList.toggle('active', !isAll && selectedStores.has('silpo'));
+  document.getElementById('storePillEva')?.classList.toggle('active', !isAll && selectedStores.has('eva'));
+}
+window.updateStoreFilterUI = updateStoreFilterUI;
+
+function selectOnlinePromoFilter(mode) {
+  initAudio();
+  playTickSound(1);
+  triggerHaptics(1, true);
+
+  filterOnlinePromo = mode;
+  document.querySelectorAll('#filterDropdown .filter-pills-wrap .filter-pill-chip[id^="ftOnline"]').forEach(b => {
+    b.classList.remove('active');
+  });
+  if (mode === 'hide') document.getElementById('ftOnlineHide')?.classList.add('active');
+  else if (mode === 'show') document.getElementById('ftOnlineShow')?.classList.add('active');
+  else if (mode === 'only') document.getElementById('ftOnlineOnly')?.classList.add('active');
+
+  trackAnalyticsEvent('click', `Фільтр онлайн-акцій: ${mode}`);
+  updateFilterButtonState();
+  applyFiltersAndRender();
+}
+window.selectOnlinePromoFilter = selectOnlinePromoFilter;
 
 function selectDiscountMinFilter(minPct) {
   initAudio();
@@ -1348,14 +1447,18 @@ function resetAllFilters() {
   triggerHaptics(1, true);
 
   currentStore = 'all';
+  selectedStores = new Set(['avrora', 'atb', 'silpo', 'eva']);
   filterDiscountMin = 0;
   filterPriceRange = 'all';
   filterOnlyWithWeight = false;
   filterOnlyInStock = true;
+  filterOnlinePromo = 'hide';
 
   // Оновлення інтерфейсу
-  document.querySelectorAll('.filter-store-pills .filter-tag').forEach(b => b.classList.remove('active'));
-  document.getElementById('ftStoreAll')?.classList.add('active');
+  updateStoreFilterUI();
+
+  document.querySelectorAll('#filterDropdown .filter-pills-wrap .filter-pill-chip[id^="ftOnline"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('ftOnlineHide')?.classList.add('active');
 
   document.querySelectorAll('#filterDropdown .filter-pills-wrap .filter-pill-chip[id^="ftDisc"]').forEach(b => b.classList.remove('active'));
   document.getElementById('ftDiscAll')?.classList.add('active');
@@ -1653,13 +1756,14 @@ function selectSortOption(sortKey) {
 window.selectSortOption = selectSortOption;
 
 function updateFilterButtonState() {
-  const isCustomStore = currentStore !== 'all';
+  const isCustomStore = selectedStores.size < 4;
   const isCustomDiscount = filterDiscountMin > 0;
   const isCustomPrice = filterPriceRange !== 'all';
   const isCustomWeight = filterOnlyWithWeight;
   const isCustomStock = !filterOnlyInStock;
+  const isCustomOnline = filterOnlinePromo !== 'hide';
 
-  const activeCount = [isCustomStore, isCustomDiscount, isCustomPrice, isCustomWeight, isCustomStock].filter(Boolean).length;
+  const activeCount = [isCustomStore, isCustomDiscount, isCustomPrice, isCustomWeight, isCustomStock, isCustomOnline].filter(Boolean).length;
   const hasActiveFilter = activeCount > 0;
 
   const filterBtn = document.getElementById('filterRoundBtn');
@@ -1914,6 +2018,7 @@ function createCardSlot(product, index) {
       <span class="category-label ${sm.badgeClass}">${sm.label}</span>
       <span class="weight-label">${product.weight || ''}</span>
       ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
+      ${product.is_only_online ? '<span class="online-only-badge">📱 Тільки онлайн</span>' : ''}
     </div>
     <div class="product-name" title="${product.title}">${product.title}</div>
   `;
@@ -2381,6 +2486,7 @@ function renderGrid() {
         <div class="category-row">
           <span class="category-label ${sm.badgeClass}">${sm.label}</span>
           ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
+          ${p.is_only_online ? '<span class="online-only-badge">📱 Тільки онлайн</span>' : ''}
         </div>
         <div class="grid-card-title" title="${p.title}">${p.title}</div>
         <div class="in-stock available">

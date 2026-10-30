@@ -27,6 +27,18 @@ DEFAULT_HEADERS = {
 }
 
 CITIES_BRANCHES = {
+    "Львів (вул. Кульпарківська, 226А / Victoria Gardens)": {
+        "branchId": "1edb6b12-3f2d-681e-9a93-eb10f39e9fe0",
+        "city": "Львів",
+        "address": "вул. Кульпарківська, 226А",
+        "deliveryType": "DeliveryHome"
+    },
+    "Львів (вул. Стрийська, 45)": {
+        "branchId": "1edb7315-741c-6498-b7b4-d5cf071d641d",
+        "city": "Львів",
+        "address": "вул. Стрийська, 45",
+        "deliveryType": "DeliveryHome"
+    },
     "Львів (пл. Соборна, 14-15 / Центр)": {
         "branchId": "1edb7351-d076-60fe-a545-51c4e9ef1e54",
         "city": "Львів",
@@ -71,7 +83,7 @@ CITIES_BRANCHES = {
     }
 }
 
-DEFAULT_BRANCH_ID = CITIES_BRANCHES["Львів (пл. Соборна, 14-15 / Центр)"]["branchId"]
+DEFAULT_BRANCH_ID = CITIES_BRANCHES["Львів (вул. Кульпарківська, 226А / Victoria Gardens)"]["branchId"]
 BACKUP_BRANCH_ID = CITIES_BRANCHES["Київ (вул. Басейна, 6 / Центр)"]["branchId"]
 
 
@@ -88,6 +100,18 @@ def normalize_product(item: Dict[str, Any]) -> Dict[str, Any]:
 
     if old_price and old_price > price:
         discount_percent = round((1 - (price / old_price)) * 100)
+
+    # Перевірка на акцію "Тільки онлайн"
+    promotions = item.get("promotions") or []
+    is_only_online = any(
+        (isinstance(p, dict) and (
+            p.get("id") == "only_online" or 
+            "82846" in str(p.get("iconPath", "")) or 
+            "only_online" in str(p.get("iconPath", "")) or
+            p.get("classActivity") == 9
+        ))
+        for p in promotions
+    )
 
     icon = item.get("icon")
     slug = item.get("slug") or ""
@@ -126,7 +150,10 @@ def normalize_product(item: Dict[str, Any]) -> Dict[str, Any]:
         "rating_count": item.get("guestProductRatingCount", 0),
         "category_slug": item.get("sectionSlug"),
         "branch_id": item.get("branchId"),
-        "promo_name": "Цінотижики" if (discount_percent or saving > 0) else None
+        "promo_name": "Цінотижики (онлайн)" if is_only_online else ("Цінотижики" if (discount_percent or saving > 0) else None),
+        "is_only_online": is_only_online,
+        "online_price": round(float(price), 2) if is_only_online else None,
+        "shelf_price": round(float(old_price), 2) if (is_only_online and old_price) else round(float(price), 2)
     }
 
 

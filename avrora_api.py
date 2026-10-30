@@ -108,8 +108,26 @@ def _parse_card(card) -> Optional[Dict[str, Any]]:
         if link and not link.startswith("http"):
             link = BASE_URL + link
 
-        # Зображення
-        image = img_el.get("src", "") if img_el else ""
+        # Зображення (з обходом lazy loading CS-Cart / Аврори)
+        image = ""
+        if img_el and img_el.get("data-src"):
+            image = img_el.get("data-src")
+        if not image:
+            gal = card.select_one(".gallery-products__items[data-imggallery]")
+            if gal and gal.get("data-imggallery"):
+                image = gal.get("data-imggallery")
+        if not image and img_el:
+            src = img_el.get("src", "")
+            if src and "lazyimage" not in src:
+                image = src
+        if not image and img_el and img_el.get("data-lazy-src"):
+            image = img_el.get("data-lazy-src")
+        if not image and img_el and img_el.get("srcset"):
+            image = img_el.get("srcset").split()[0]
+        if image and image.startswith("//"):
+            image = "https:" + image
+        elif image and image.startswith("/"):
+            image = BASE_URL + image
 
         # Стара ціна: .ty-list-price → перший .ty-price-num з числом
         old_price_nums = card.select(".ty-list-price .ty-price-num")
@@ -202,9 +220,9 @@ def get_avrora_promos_page(page: int = 1, timeout: int = REQUEST_TIMEOUT) -> Lis
     return get_avrora_promos(pages=(page,), timeout=timeout)
 
 
-def search_avrora(query: str, timeout: int = REQUEST_TIMEOUT) -> List[Dict[str, Any]]:
+def search_avrora(query: str, page: int = 1, timeout: int = REQUEST_TIMEOUT) -> List[Dict[str, Any]]:
     """
-    Пошук товарів на Авроровому сайті.
+    Пошук товарів на Авроровому сайті з підтримкою пагінації.
     Повертає список уніфікованих словників.
     """
     if not query:
@@ -217,9 +235,11 @@ def search_avrora(query: str, timeout: int = REQUEST_TIMEOUT) -> List[Dict[str, 
         "q": query,
         "dispatch": "products.search",
     }
+    if page > 1:
+        params["page"] = page
     html = _get(BASE_URL + "/", params=params, timeout=timeout)
     if not html:
         return []
     items = _parse_page(html)
-    logger.info("Аврора пошук '%s': %d товарів", query, len(items))
+    logger.info("Аврора пошук '%s' (стор. %d): %d товарів", query, page, len(items))
     return items
