@@ -68,6 +68,56 @@ function getProductImg(p) {
   return p.image_url || p.image_large_url || p.image || '';
 }
 
+// Універсальні метадані магазинів (🟡 Аврора, 🔴 АТБ, 🟠 Сільпо, 🟢 EVA)
+function getStoreMeta(store) {
+  if (store === 'avrora') {
+    return {
+      name: 'Аврора',
+      fullName: 'Мультимаркет Аврора',
+      emoji: '🟡',
+      label: '🟡 Аврора',
+      badgeClass: 'category-avrora',
+      cardBadgeClass: 'card-store-avrora',
+      color: 'var(--avrora-yellow, #f59e0b)',
+      btnColor: 'var(--avrora-yellow, #f59e0b)'
+    };
+  } else if (store === 'eva') {
+    return {
+      name: 'EVA',
+      fullName: 'Мережа магазинів EVA',
+      emoji: '🟢',
+      label: '🟢 EVA',
+      badgeClass: 'category-eva',
+      cardBadgeClass: 'card-store-eva',
+      color: 'var(--eva-green, #16a34a)',
+      btnColor: 'var(--eva-green, #16a34a)'
+    };
+  } else if (store === 'silpo') {
+    return {
+      name: 'Сільпо',
+      fullName: 'Сільпо',
+      emoji: '🟠',
+      label: '🟠 Сільпо',
+      badgeClass: 'category-silpo',
+      cardBadgeClass: 'card-store-silpo',
+      color: 'var(--silpo-orange, #ea580c)',
+      btnColor: 'var(--silpo-orange, #ea580c)'
+    };
+  } else {
+    return {
+      name: 'АТБ',
+      fullName: 'АТБ-Маркет',
+      emoji: '🔴',
+      label: '🔴 АТБ',
+      badgeClass: 'category-atb',
+      cardBadgeClass: 'card-store-atb',
+      color: 'var(--atb-red, #dc2626)',
+      btnColor: 'var(--atb-red, #dc2626)'
+    };
+  }
+}
+window.getStoreMeta = getStoreMeta;
+
 // Безпечна заглушка фото (білий прямокутник у Base64 без лапок та тексту)
 const FALLBACK_SVG = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmZmZmZmIi8+PC9zdmc+';
 
@@ -817,19 +867,40 @@ function updateCatalogCountDisplay(isLoading, count) {
   const totalFiltered = filteredProducts ? filteredProducts.length : 0;
   const totalTabs = Math.max(1, Math.ceil(totalFiltered / ITEMS_PER_TAB));
 
+  const avroraCount = filteredProducts ? filteredProducts.filter(p => p.store === 'avrora').length : 0;
   const atbCount = filteredProducts ? filteredProducts.filter(p => p.store === 'atb').length : 0;
   const silpoCount = filteredProducts ? filteredProducts.filter(p => p.store === 'silpo').length : 0;
+  const evaCount = filteredProducts ? filteredProducts.filter(p => p.store === 'eva').length : 0;
 
-  // Оновлюємо кнопки фільтра магазину
+  // Оновлюємо кнопки фільтра магазину в меню
   const ftAll = document.getElementById('ftStoreAll');
+  const ftAvrora = document.getElementById('ftStoreAvrora');
   const ftAtb = document.getElementById('ftStoreAtb');
   const ftSilpo = document.getElementById('ftStoreSilpo');
+  const ftEva = document.getElementById('ftStoreEva');
+
+  const totalAvroraAll = allProducts ? allProducts.filter(p => p.store === 'avrora').length : 0;
   const totalAtbAll = allProducts ? allProducts.filter(p => p.store === 'atb').length : 0;
   const totalSilpoAll = allProducts ? allProducts.filter(p => p.store === 'silpo').length : 0;
+  const totalEvaAll = allProducts ? allProducts.filter(p => p.store === 'eva').length : 0;
 
   if (ftAll) ftAll.textContent = `Всі (${allProducts.length})`;
+  if (ftAvrora) ftAvrora.textContent = `🟡 Аврора (${totalAvroraAll})`;
   if (ftAtb) ftAtb.textContent = `🔴 АТБ (${totalAtbAll})`;
   if (ftSilpo) ftSilpo.textContent = `🟠 Сільпо (${totalSilpoAll})`;
+  if (ftEva) ftEva.textContent = `🟢 EVA (${totalEvaAll})`;
+
+  // Оновлення швидких кнопок в адмінці
+  const spAll = document.getElementById('storePillAll');
+  const spAvrora = document.getElementById('storePillAvrora');
+  const spAtb = document.getElementById('storePillAtb');
+  const spSilpo = document.getElementById('storePillSilpo');
+  const spEva = document.getElementById('storePillEva');
+  if (spAll) spAll.textContent = `🛍️ Всі (${allProducts.length})`;
+  if (spAvrora) spAvrora.textContent = `🟡 Аврора (${totalAvroraAll})`;
+  if (spAtb) spAtb.textContent = `🔴 АТБ (${totalAtbAll})`;
+  if (spSilpo) spSilpo.textContent = `🟠 Сільпо (${totalSilpoAll})`;
+  if (spEva) spEva.textContent = `🟢 EVA (${totalEvaAll})`;
 
   // --- Оновлення блоку статистики в Налаштуваннях & Опціях ---
   const adminStatsBox = document.getElementById('adminStatsBox');
@@ -838,11 +909,17 @@ function updateCatalogCountDisplay(isLoading, count) {
       <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
         <span>Всього знайдено:</span> <b>${totalFiltered} шт</b>
       </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#b45309;">
+        <span>🟡 Товарів з Аврори:</span> <b>${avroraCount} шт</b>
+      </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--atb-red);">
         <span>🔴 Товарів з АТБ:</span> <b>${atbCount} шт</b>
       </div>
       <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:var(--silpo-orange);">
         <span>🟠 Товарів із Сільпо:</span> <b>${silpoCount} шт</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#15803d;">
+        <span>🟢 Товарів з EVA:</span> <b>${evaCount} шт</b>
       </div>
       <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:12px; color:var(--text3);">
         <span>Поточна вкладка:</span> <b>${currentTab} з ${totalTabs}</b>
@@ -858,11 +935,8 @@ function updateCatalogCountDisplay(isLoading, count) {
     if (isLoading && total === 0) {
       headerText.innerHTML = `<span class="loading-spin-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:#3563e9;animation:spin 0.8s linear infinite;"></span> Завантаження...`;
     } else {
-      headerText.innerHTML = `<b>${totalFiltered}</b> тов. &nbsp;🔴<b>${atbCount}</b> 🟠<b>${silpoCount}</b>`;
+      headerText.innerHTML = `<b>${totalFiltered}</b> тов. &nbsp;🟡<b>${avroraCount}</b> 🔴<b>${atbCount}</b> 🟠<b>${silpoCount}</b> 🟢<b>${evaCount}</b>`;
     }
-    headerChip.style.display = 'flex';
-
-    // Залишаємо інформацію постійно видимою без зникнення та зсуву кнопок
     headerChip.style.display = 'flex';
     headerChip.style.opacity = '1';
   }
@@ -872,7 +946,7 @@ function updateCatalogCountDisplay(isLoading, count) {
     if (isLoading && total === 0) {
       chipText.innerHTML = `Завантаження товарів...`;
     } else {
-      chipText.innerHTML = `Знайдено: <strong>${totalFiltered}</strong> | АТБ: ${atbCount} | Сільпо: ${silpoCount}`;
+      chipText.innerHTML = `Знайдено: <strong>${totalFiltered}</strong> | 🟡 Аврора: ${avroraCount} | 🔴 АТБ: ${atbCount} | 🟠 Сільпо: ${silpoCount} | 🟢 EVA: ${evaCount}`;
     }
   }
 }
@@ -1183,16 +1257,20 @@ function selectFilterStore(store) {
     b.classList.remove('active');
   });
   if (store === 'all') document.getElementById('ftStoreAll')?.classList.add('active');
+  else if (store === 'avrora') document.getElementById('ftStoreAvrora')?.classList.add('active');
   else if (store === 'atb') document.getElementById('ftStoreAtb')?.classList.add('active');
   else if (store === 'silpo') document.getElementById('ftStoreSilpo')?.classList.add('active');
+  else if (store === 'eva') document.getElementById('ftStoreEva')?.classList.add('active');
 
   // Оновлення швидких кнопок магазинів
-  document.querySelectorAll('.quick-action-pills .pill-btn').forEach(btn => {
+  document.querySelectorAll('.quick-action-pills .pill-btn, .admin-group .pill-btn').forEach(btn => {
     btn.classList.remove('active');
   });
   if (store === 'all') document.getElementById('storePillAll')?.classList.add('active');
+  else if (store === 'avrora') document.getElementById('storePillAvrora')?.classList.add('active');
   else if (store === 'atb') document.getElementById('storePillAtb')?.classList.add('active');
   else if (store === 'silpo') document.getElementById('storePillSilpo')?.classList.add('active');
+  else if (store === 'eva') document.getElementById('storePillEva')?.classList.add('active');
 
   updateFilterButtonState();
   applyFiltersAndRender();
@@ -1778,6 +1856,7 @@ function createCardSlot(product, index) {
   slot.className = 'card-slot';
   slot.dataset.index = index;
 
+  const sm = getStoreMeta(product.store);
   const isAtb = product.store === 'atb';
   const price = typeof product.price === 'number' ? product.price : parseFloat(product.price || 0);
   const oldPrice = product.old_price ? parseFloat(product.old_price) : null;
@@ -1827,12 +1906,12 @@ function createCardSlot(product, index) {
   `;
   imgArea.appendChild(priceBadge);
 
-  // Тіло картки: Сільпо — помаранчеве, АТБ — червоне
+  // Тіло картки: бейдж магазину (🟡 Аврора, 🔴 АТБ, 🟠 Сільпо, 🟢 EVA)
   const body = document.createElement('div');
   body.className = 'card-body';
   body.innerHTML = `
     <div class="category-row">
-      <span class="category-label ${isAtb ? 'category-atb' : 'category-silpo'}">${isAtb ? '🔴 АТБ' : '🟠 Сільпо'}</span>
+      <span class="category-label ${sm.badgeClass}">${sm.label}</span>
       <span class="weight-label">${product.weight || ''}</span>
       ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
     </div>
@@ -1920,8 +1999,8 @@ function createCardSlot(product, index) {
     <div class="back-specs-container">
       <div style="text-align:center; padding:15px; color:var(--text3); font-size:12px;">Завантаження інформації про товар...</div>
     </div>
-    <a href="${product.link || product.product_url || '#'}" target="_blank" class="back-store-btn" style="background:${isAtb ? 'var(--atb-red)' : 'var(--silpo-orange)'};">
-      <i class="fa-solid fa-arrow-up-right-from-square"></i> Відкрити на сайті ${isAtb ? 'АТБ' : 'Сільпо'}
+    <a href="${product.link || product.product_url || '#'}" target="_blank" class="back-store-btn" style="background:${sm.btnColor};">
+      <i class="fa-solid fa-arrow-up-right-from-square"></i> Відкрити на сайті ${sm.name}
     </a>
   `;
   // Забезпечуємо безперешкодний вертикальний скрол на телефонах
@@ -1988,7 +2067,7 @@ async function loadProductSpecs(innerEl, product) {
     } else {
       container.innerHTML = `
         <table class="back-specs-table">
-          <tr><td>Магазин</td><td>${product.store === 'atb' ? 'АТБ-Маркет' : 'Сільпо'}</td></tr>
+          <tr><td>Магазин</td><td>${getStoreMeta(product.store).fullName}</td></tr>
           <tr><td>Фасування</td><td>${product.weight || 'Стандартне'}</td></tr>
           <tr><td>Бренд</td><td>${product.brand || 'Власний імпорт / ТМ'}</td></tr>
           <tr><td>Ціна</td><td>${product.price} ₴</td></tr>
@@ -2280,6 +2359,7 @@ function renderGrid() {
 
   // Рендеримо ТІЛЬКИ 100 товарів поточної вкладки
   pageItems.forEach((p, idx) => {
+    const sm = getStoreMeta(p.store);
     const isAtb = p.store === 'atb';
     const price = typeof p.price === 'number' ? p.price : parseFloat(p.price || 0);
     const oldPrice = p.old_price ? parseFloat(p.old_price) : null;
@@ -2299,7 +2379,7 @@ function renderGrid() {
       </div>
       <div class="grid-card-body">
         <div class="category-row">
-          <span class="category-label ${isAtb ? 'category-atb' : 'category-silpo'}">${isAtb ? '🔴 АТБ' : '🟠 Сільпо'}</span>
+          <span class="category-label ${sm.badgeClass}">${sm.label}</span>
           ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
         </div>
         <div class="grid-card-title" title="${p.title}">${p.title}</div>
@@ -2718,6 +2798,7 @@ function updateCartUI() {
   let silpoCount = 0;
 
   itemsContainer.innerHTML = cart.map((item, idx) => {
+    const sm = getStoreMeta(item.store);
     const isAtb = item.store === 'atb';
     const price = typeof item.price === 'number' ? item.price : parseFloat(item.price || 0);
     const imgSrc = getProductImg(item);
@@ -2734,7 +2815,7 @@ function updateCartUI() {
       <div class="cart-item">
         <img class="cart-item-img" src="${imgSrc || FALLBACK_SVG}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
         <div class="cart-item-info">
-          <span class="cart-item-store ${isAtb ? 'atb' : 'silpo'}">${isAtb ? '🔴 АТБ' : '🟠 Сільпо'}</span>
+          <span class="cart-item-store" style="color:${sm.color}; font-weight:700;">${sm.label}</span>
           <div class="cart-item-name">${item.title}</div>
           <div class="cart-item-price">${price.toFixed(2)} ₴</div>
         </div>
@@ -3020,8 +3101,10 @@ async function loadCrazyDeals() {
 function filterDeals(store) {
   document.querySelectorAll('#crazyDealsModal .pill-btn').forEach(b => b.classList.remove('active'));
   if (store === 'all') document.getElementById('dealTabAll')?.classList.add('active');
+  else if (store === 'avrora') document.getElementById('dealTabAvrora')?.classList.add('active');
   else if (store === 'atb') document.getElementById('dealTabAtb')?.classList.add('active');
   else if (store === 'silpo') document.getElementById('dealTabSilpo')?.classList.add('active');
+  else if (store === 'eva') document.getElementById('dealTabEva')?.classList.add('active');
 
   const filtered = store === 'all' ? allDeals : allDeals.filter(d => d.store === store);
   renderDeals(filtered);
@@ -3036,13 +3119,13 @@ function renderDeals(deals) {
   }
 
   container.innerHTML = deals.map(d => {
-    const isAtb = d.store === 'atb';
+    const sm = getStoreMeta(d.store);
     const imgSrc = getProductImg(d);
     return `
       <div style="background:#fff; border:1px solid var(--border); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span class="card-store-badge ${isAtb ? 'card-store-atb' : 'card-store-silpo'}" style="position:static;">
-            ${isAtb ? 'АТБ' : 'Сільпо'}
+          <span class="card-store-badge ${sm.cardBadgeClass}" style="position:static;">
+            ${sm.label}
           </span>
           <span style="background:#ef4444; color:#fff; font-size:11px; font-weight:800; padding:2px 6px; border-radius:6px;">-${d.discount_percent || 40}%</span>
         </div>

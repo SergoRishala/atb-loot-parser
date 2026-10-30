@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>LOOT — Floating Price: АТБ & Сільпо PRO</title>
+  <title>LOOT — Floating Price: Аврора, АТБ, Сільпо & EVA PRO</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=2.8"/>
+  <link rel="stylesheet" href="/static/style.css?v=5.0"/>
   <link rel="icon" href="https://silpo.ua/favicon.ico" type="image/x-icon"/>
   <!-- Штрихкод сканер бібліотека -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -336,8 +336,10 @@
         <div class="filter-section-lbl">🏪 Супермаркет:</div>
         <div class="filter-store-pills">
           <button class="filter-tag active" id="ftStoreAll" onclick="selectFilterStore('all')">Всі</button>
+          <button class="filter-tag" id="ftStoreAvrora" onclick="selectFilterStore('avrora')">🟡 Аврора</button>
           <button class="filter-tag" id="ftStoreAtb" onclick="selectFilterStore('atb')">🔴 АТБ</button>
           <button class="filter-tag" id="ftStoreSilpo" onclick="selectFilterStore('silpo')">🟠 Сільпо</button>
+          <button class="filter-tag" id="ftStoreEva" onclick="selectFilterStore('eva')">🟢 EVA</button>
         </div>
       </div>
 
@@ -496,10 +498,12 @@
       <!-- 1. Фільтр магазину -->
       <div class="admin-group">
         <div class="admin-group-label">Вибір мережі магазинів</div>
-        <div style="display:flex; gap:8px;">
-          <button class="pill-btn active" id="storePillAll" style="flex:1; justify-content:center;" onclick="setStoreFilter('all')">🛍️ Всі</button>
-          <button class="pill-btn pill-atb" id="storePillAtb" style="flex:1; justify-content:center;" onclick="setStoreFilter('atb')">🔴 АТБ</button>
-          <button class="pill-btn pill-silpo" id="storePillSilpo" style="flex:1; justify-content:center;" onclick="setStoreFilter('silpo')">🟠 Сільпо</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="pill-btn active" id="storePillAll" style="flex:1; min-width:70px; justify-content:center;" onclick="setStoreFilter('all')">🛍️ Всі</button>
+          <button class="pill-btn pill-avrora" id="storePillAvrora" style="flex:1; min-width:85px; justify-content:center;" onclick="setStoreFilter('avrora')">🟡 Аврора</button>
+          <button class="pill-btn pill-atb" id="storePillAtb" style="flex:1; min-width:75px; justify-content:center;" onclick="setStoreFilter('atb')">🔴 АТБ</button>
+          <button class="pill-btn pill-silpo" id="storePillSilpo" style="flex:1; min-width:85px; justify-content:center;" onclick="setStoreFilter('silpo')">🟠 Сільпо</button>
+          <button class="pill-btn pill-eva" id="storePillEva" style="flex:1; min-width:75px; justify-content:center;" onclick="setStoreFilter('eva')">🟢 EVA</button>
         </div>
       </div>
 
@@ -791,8 +795,10 @@
 
     <div style="display:flex; gap:8px; margin-bottom:14px;">
       <button class="pill-btn active" id="dealTabAll" onclick="filterDeals('all')">Всі знижки</button>
+      <button class="pill-btn pill-avrora" id="dealTabAvrora" onclick="filterDeals('avrora')">🟡 Аврора</button>
       <button class="pill-btn pill-atb" id="dealTabAtb" onclick="filterDeals('atb')">🔴 Акції АТБ</button>
-      <button class="pill-btn pill-silpo" id="dealTabSilpo" onclick="filterDeals('silpo')">🟠 Цінотижики Сільпо</button>
+      <button class="pill-btn pill-silpo" id="dealTabSilpo" onclick="filterDeals('silpo')">🟠 Сільпо</button>
+      <button class="pill-btn pill-eva" id="dealTabEva" onclick="filterDeals('eva')">🟢 EVA</button>
     </div>
 
     <div id="crazyDealsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; max-height:450px; overflow-y:auto;">
@@ -918,6 +924,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=4.0"></script>
+<script src="/static/app.js?v=5.0"></script>
 </body>
 </html>

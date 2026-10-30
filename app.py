@@ -20,6 +20,8 @@ from flask import Flask, render_template, request, jsonify, send_file, redirect
 
 import atb_api
 import silpo_api
+import avrora_api
+import eva_api
 from silpo_mcp import SilpoMCPClient, TOKEN_FILE
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -274,11 +276,13 @@ def find_smart_category(raw_q: str):
 @app.route("/api/search")
 def search():
     """
-    Уніфікований пошук товарів з підтримкою вибору магазину:
-    - Якщо пошуковий запит порожній (стартова сторінка) або q='акції' — повертає гарячі акційні товари АТБ & Сільпо
-    - store=all: паралельний запит до АТБ та Сільпо через ThreadPoolExecutor
+    Уніфікований пошук товарів з підтримкою 4 магазинів (🟡 Аврора, 🔴 АТБ, 🟠 Сільпо, 🟢 EVA):
+    - Якщо пошуковий запит порожній (стартова сторінка) або q='акції' — повертає гарячі акційні товари всіх магазинів
+    - store=all: паралельний запит до 4 магазинів через ThreadPoolExecutor
+    - store=avrora: тільки Аврора
     - store=atb: тільки АТБ
     - store=silpo: тільки Сільпо
+    - store=eva: тільки EVA
     """
     raw_query = request.args.get("q", "").strip()
     store = request.args.get("store", "all").strip().lower()
@@ -292,11 +296,20 @@ def search():
     is_promo_mode = (not raw_query or raw_query.lower() in ("promotions", "акції", "знижки", "акція") or only_promo)
     query = raw_query if raw_query else "🔥 Гарячі акції"
 
+    avrora_items = []
     atb_items = []
     silpo_items = []
+    eva_items = []
     errors = {}
 
     if is_promo_mode:
+        def fetch_promo_avrora():
+            try:
+                return avrora_api.get_avrora_promos_page(page=page, timeout=12)
+            except Exception as e:
+                errors["avrora"] = str(e)
+                return []
+
         def fetch_promo_atb():
             try:
                 return atb_api.get_atb_promos_page(page=page, urls_per_batch=2, timeout=12)
@@ -313,21 +326,52 @@ def search():
                 errors["silpo"] = str(e)
                 return []
 
+        def fetch_promo_eva():
+            try:
+                return eva_api.get_eva_promos(page=page, timeout=12)
+            except Exception as e:
+                errors["eva"] = str(e)
+                return []
+
         if store == "all":
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                future_atb = executor.submit(fetch_promo_atb)
-                future_silpo = executor.submit(fetch_promo_silpo)
-                atb_items = future_atb.result() or []
-                silpo_items = future_silpo.result() or []
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                f_avrora = executor.submit(fetch_promo_avrora)
+                f_atb = executor.submit(fetch_promo_atb)
+                f_silpo = executor.submit(fetch_promo_silpo)
+                f_eva = executor.submit(fetch_promo_eva)
+                avrora_items = f_avrora.result() or []
+                atb_items = f_atb.result() or []
+                silpo_items = f_silpo.result() or []
+                eva_items = f_eva.result() or []
+        elif store == "avrora":
+            avrora_items = fetch_promo_avrora()
         elif store == "atb":
             atb_items = fetch_promo_atb()
         elif store == "silpo":
             silpo_items = fetch_promo_silpo()
+        elif store == "eva":
+            eva_items = fetch_promo_eva()
     else:
         cat_id, cat_info = find_smart_category(raw_query)
         if cat_info:
             subq_batches = cat_info["sub_queries"]
             current_subqueries = subq_batches[(page - 1) % len(subq_batches)]
+
+            def fetch_avrora():
+                items = []
+                seen = set()
+                try:
+                    with ThreadPoolExecutor(max_workers=len(current_subqueries)) as ex:
+                        for res in ex.map(lambda q: avrora_api.search_avrora(q, timeout=12), current_subqueries):
+                            for p in res:
+                                k = p.get("product_url") or p.get("title")
+                                if k not in seen:
+                                    seen.add(k)
+                                    items.append(p)
+                    return items
+                except Exception as e:
+                    errors["avrora"] = str(e)
+                    return []
 
             def fetch_atb():
                 items = []
@@ -361,7 +405,30 @@ def search():
                 except Exception as e:
                     errors["silpo"] = str(e)
                     return []
+
+            def fetch_eva():
+                items = []
+                seen = set()
+                try:
+                    with ThreadPoolExecutor(max_workers=len(current_subqueries)) as ex:
+                        for res in ex.map(lambda q: eva_api.search_eva(q, timeout=12), current_subqueries):
+                            for p in res:
+                                k = p.get("product_url") or p.get("title")
+                                if k not in seen:
+                                    seen.add(k)
+                                    items.append(p)
+                    return items
+                except Exception as e:
+                    errors["eva"] = str(e)
+                    return []
         else:
+            def fetch_avrora():
+                try:
+                    return avrora_api.search_avrora(raw_query, timeout=15)
+                except Exception as e:
+                    errors["avrora"] = str(e)
+                    return []
+
             def fetch_atb():
                 try:
                     res = atb_api.search_atb(raw_query, page=page, timeout=15)
@@ -391,31 +458,54 @@ def search():
                     errors["silpo"] = str(e)
                     return []
 
+            def fetch_eva():
+                try:
+                    return eva_api.search_eva(raw_query, page=page, timeout=15)
+                except Exception as e:
+                    errors["eva"] = str(e)
+                    return []
+
         if store == "all":
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                future_atb = executor.submit(fetch_atb)
-                future_silpo = executor.submit(fetch_silpo)
-                atb_items = future_atb.result() or []
-                silpo_items = future_silpo.result() or []
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                f_avrora = executor.submit(fetch_avrora)
+                f_atb = executor.submit(fetch_atb)
+                f_silpo = executor.submit(fetch_silpo)
+                f_eva = executor.submit(fetch_eva)
+                avrora_items = f_avrora.result() or []
+                atb_items = f_atb.result() or []
+                silpo_items = f_silpo.result() or []
+                eva_items = f_eva.result() or []
+        elif store == "avrora":
+            avrora_items = fetch_avrora()
         elif store == "atb":
             atb_items = fetch_atb()
         elif store == "silpo":
             silpo_items = fetch_silpo()
+        elif store == "eva":
+            eva_items = fetch_eva()
 
     if store == "all":
-        # Чергуємо товари з АТБ та Сільпо для зручного порівняння поруч
+        # Чергуємо товари з усіх 4 магазинів для зручного порівняння: 🟡 Аврора, 🔴 АТБ, 🟠 Сільпо, 🟢 EVA
         combined = []
-        max_len = max(len(atb_items), len(silpo_items))
+        max_len = max(len(avrora_items), len(atb_items), len(silpo_items), len(eva_items))
         for i in range(max_len):
+            if i < len(avrora_items):
+                combined.append(avrora_items[i])
             if i < len(atb_items):
                 combined.append(atb_items[i])
             if i < len(silpo_items):
                 combined.append(silpo_items[i])
+            if i < len(eva_items):
+                combined.append(eva_items[i])
         products = combined
+    elif store == "avrora":
+        products = avrora_items
     elif store == "atb":
         products = atb_items
     elif store == "silpo":
         products = silpo_items
+    elif store == "eva":
+        products = eva_items
     else:
         return jsonify({"success": False, "error": f"Невідомий магазин: {store}"}), 400
 
@@ -517,8 +607,10 @@ def search():
         "limit": limit,
         "is_promo": is_promo_mode,
         "total": len(products),
+        "avrora_count": len(avrora_items),
         "atb_count": len(atb_items),
         "silpo_count": len(silpo_items),
+        "eva_count": len(eva_items),
         "items": products,
         "has_more": len(products) > 0,
         "errors": errors if errors else None
@@ -573,6 +665,22 @@ def api_details():
     if "atbmarket.com" in url or store == "atb":
         chars = atb_api.get_atb_details(url)
         return jsonify(chars)
+
+    if "avrora.ua" in url or store == "avrora":
+        return jsonify({
+            "Магазин": "Мультимаркет Аврора 🟡",
+            "Офіційний сайт": "avrora.ua",
+            "Доставка": "Самовивіз з магазинів Аврора або доставка перевізниками",
+            "Оплата": "Онлайн карткою, Google Pay, Apple Pay або на касі"
+        })
+
+    if "eva.ua" in url or store == "eva":
+        return jsonify({
+            "Магазин": "Мережа магазинів EVA 🟢",
+            "Офіційний сайт": "eva.ua",
+            "Доставка": "Точки видачі EVA.UA, Нова Пошта, Укрпошта, кур'єр",
+            "Оплата": "Карткою онлайн, на касі магазину або при отриманні"
+        })
 
     if not slug and "silpo.ua/product/" in url:
         slug = url.split("/product/")[-1].split("?")[0].strip("/")
