@@ -23,7 +23,7 @@ let filterDiscountMin = 0; // 0 = всі, 1 = будь-яка знижка, 20 =
 let filterPriceRange = 'all'; // 'all', '0-50', '50-100', '100-250', '250+'
 let filterOnlyWithWeight = false; // Тільки з вагою (ціна за 100г/мл)
 let filterOnlyInStock = true; // Тільки в наявності
-let currentViewMode = 'grid2'; // 'grid2' (2 col), 'grid3' (3 col), '3d' (карусель), 'dual'
+let currentViewMode = window.innerWidth <= 768 ? 'grid3' : 'grid4'; // Для мобільних за замовчуванням 3 в ряд, для ПК 4 в ряд
 let selectedBranchId = '1edb7351-d076-60fe-a545-51c4e9ef1e54'; // Дефолтне Сільпо (Київ)
 let cart = [];
 let wishlist = [];
@@ -744,9 +744,13 @@ async function performSearch(query) {
   renderCurrentView();
 
   try {
+    const activeStoreParam = (selectedStores && selectedStores.size > 0 && selectedStores.size < 4)
+      ? Array.from(selectedStores).join(',')
+      : 'all';
+
     const qs = new URLSearchParams({
       q: query,
-      store: 'all',
+      store: activeStoreParam,
       branch_id: selectedBranchId,
       page: 1,
       limit: 100,
@@ -797,9 +801,13 @@ async function startBackgroundLoading(query, seq) {
 
   while (page <= maxPages && currentSearchSeq === seq) {
     try {
+      const activeStoreParam = (selectedStores && selectedStores.size > 0 && selectedStores.size < 4)
+        ? Array.from(selectedStores).join(',')
+        : 'all';
+
       const qs = new URLSearchParams({
         q: query,
-        store: 'all',
+        store: activeStoreParam,
         branch_id: selectedBranchId,
         page: page,
         limit: 100,
@@ -1118,7 +1126,7 @@ function applyFiltersAndRender_NoReset() {
 
   // Якщо сортування активне і новий товар випередив інші (наприклад знижка 62% стала вище за 60%),
   // виявляємо зміну порядку карток на поточній вкладці і оновлюємо сітку зі збереженням скролу!
-  if (currentViewMode === 'grid2' || currentViewMode === 'grid3') {
+  if (currentViewMode.startsWith('grid')) {
     const startIndex = (currentTab - 1) * ITEMS_PER_TAB;
     const pageItems = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_TAB);
     const existingCards = productsGrid.querySelectorAll('.grid-product-card');
@@ -1163,17 +1171,24 @@ function applyFiltersAndRender() {
 function applyFiltersAndRender_Core() {
   let filtered = [...allProducts];
 
-  // 0. Точний пошук у лапках/дужках: "old spice", (old spice), «old spice»
+  // 0. Точний пошук у лапках/дужках або з крапкою: "old spice", .old spice, (old spice), «old spice»
   if (currentSearchQuery) {
-    const qMatches = currentSearchQuery.match(/["“«\(]([^"”»\)]+)["”»\)]/g);
+    const rawQ = currentSearchQuery.trim();
+    const isDot = rawQ.startsWith('.') && rawQ.length > 1;
     let reqWords = [];
-    if (qMatches && qMatches.length > 0) {
-      qMatches.forEach(chunk => {
-        const clean = chunk.replace(/["“«»”\(\)]/g, '').trim().toLowerCase();
-        clean.split(/\s+/).forEach(w => { if (w) reqWords.push(w); });
-      });
-    } else if (currentSearchQuery.startsWith('"') && currentSearchQuery.endsWith('"') && currentSearchQuery.length > 2) {
-      reqWords = currentSearchQuery.slice(1, -1).trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    if (isDot) {
+      reqWords = rawQ.slice(1).trim().toLowerCase().split(/\s+/).filter(Boolean);
+    } else {
+      const qMatches = rawQ.match(/["“«\(]([^"”»\)]+)["”»\)]/g);
+      if (qMatches && qMatches.length > 0) {
+        qMatches.forEach(chunk => {
+          const clean = chunk.replace(/["“«»”\(\)]/g, '').trim().toLowerCase();
+          clean.split(/\s+/).forEach(w => { if (w) reqWords.push(w); });
+        });
+      } else if (rawQ.startsWith('"') && rawQ.endsWith('"') && rawQ.length > 2) {
+        reqWords = rawQ.slice(1, -1).trim().toLowerCase().split(/\s+/).filter(Boolean);
+      }
     }
 
     if (reqWords.length > 0) {
@@ -1339,8 +1354,38 @@ window.toggleStoreFilter = toggleStoreFilter;
 window.selectFilterStore = toggleStoreFilter;
 window.setStoreFilter = toggleStoreFilter;
 
+function selectSingleStoreTab(store) {
+  initAudio();
+  playTickSound(1);
+  triggerHaptics(1, true);
+
+  if (store === 'all') {
+    selectedStores = new Set(['avrora', 'atb', 'silpo', 'eva']);
+    currentStore = 'all';
+  } else {
+    selectedStores = new Set([store]);
+    currentStore = store;
+  }
+
+  updateStoreFilterUI();
+  updateFilterButtonState();
+
+  // Очищуємо пошуковий інпут та запускаємо свіжий запит для обраного магазину
+  searchInput.value = '';
+  currentSearchQuery = '';
+  performSearch('');
+}
+window.selectSingleStoreTab = selectSingleStoreTab;
+
 function updateStoreFilterUI() {
   const isAll = selectedStores.size === 4;
+
+  // Оновлення швидких вкладок магазинів (у шапці над пошуком)
+  document.getElementById('tabMainStoreAll')?.classList.toggle('active', isAll);
+  document.getElementById('tabMainStoreAvrora')?.classList.toggle('active', !isAll && selectedStores.size === 1 && selectedStores.has('avrora'));
+  document.getElementById('tabMainStoreAtb')?.classList.toggle('active', !isAll && selectedStores.size === 1 && selectedStores.has('atb'));
+  document.getElementById('tabMainStoreSilpo')?.classList.toggle('active', !isAll && selectedStores.size === 1 && selectedStores.has('silpo'));
+  document.getElementById('tabMainStoreEva')?.classList.toggle('active', !isAll && selectedStores.size === 1 && selectedStores.has('eva'));
 
   // Оновлення тегів у випадаючому меню фільтрів
   document.getElementById('ftStoreAll')?.classList.toggle('active', isAll);
@@ -1827,7 +1872,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ═══════════════════════════════════════════
-//   ПЕРЕМИКАЧ РЕЖИМІВ (3D, СІТКА, VS)
+//   ПЕРЕМИКАЧ РЕЖИМІВ (3D, СІТКА 2/3/4/5, VS)
 // ═══════════════════════════════════════════
 function switchViewMode(mode) {
   currentViewMode = mode;
@@ -1848,6 +1893,10 @@ function switchViewMode(mode) {
       roundIcon.className = 'fa-solid fa-table-cells-large';
     } else if (mode === 'grid3') {
       roundIcon.className = 'fa-solid fa-table-cells';
+    } else if (mode === 'grid4') {
+      roundIcon.className = 'fa-solid fa-border-all';
+    } else if (mode === 'grid5') {
+      roundIcon.className = 'fa-solid fa-grip';
     } else if (mode === 'dual') {
       roundIcon.className = 'fa-solid fa-bolt';
     }
@@ -1855,14 +1904,22 @@ function switchViewMode(mode) {
 
   // Оновлюємо підказку кнопки
   const roundBtn = document.getElementById('viewToggleRoundBtn');
-  const labels = { grid2: '2 колонки', grid3: '3 колонки', '3d': 'Карусель', dual: 'Порівняння' };
+  const labels = {
+    grid2: '2 в ряд',
+    grid3: '3 в ряд',
+    grid4: '4 в ряд',
+    grid5: '5 в ряд',
+    '3d': 'Карусель',
+    dual: 'Порівняння'
+  };
   if (roundBtn) roundBtn.title = `Режим: ${labels[mode] || mode} → клік для зміни`;
 
   // CSS-клас кількості колонок
   if (productsGrid) {
-    productsGrid.classList.remove('cols-2', 'cols-3');
-    if (mode === 'grid2') productsGrid.classList.add('cols-2');
-    if (mode === 'grid3') productsGrid.classList.add('cols-3');
+    productsGrid.classList.remove('cols-2', 'cols-3', 'cols-4', 'cols-5');
+    if (mode.startsWith('grid')) {
+      productsGrid.classList.add('cols-' + mode.replace('grid', ''));
+    }
   }
 
   if (mode === '3d') {
@@ -1871,7 +1928,7 @@ function switchViewMode(mode) {
     productsGrid.style.display = 'none';
     dualViewContainer.style.display = 'none';
     renderStage();
-  } else if (mode === 'grid2' || mode === 'grid3') {
+  } else if (mode.startsWith('grid')) {
     document.body.classList.remove('mode-3d-locked');
     stageContainer.style.display = 'none';
     productsGrid.style.display = 'grid';
@@ -1892,14 +1949,33 @@ function cycleViewMode() {
   playTickSound(1);
   triggerHaptics(1, true);
 
-  if (currentViewMode === 'grid2') {
-    switchViewMode('grid3');
-  } else if (currentViewMode === 'grid3') {
-    switchViewMode('3d');
-  } else if (currentViewMode === '3d') {
-    switchViewMode('dual');
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    // На телефоні: 3 в ряд (за замовчуванням) → 2 в ряд → Карусель → Порівняння → 3 в ряд
+    if (currentViewMode === 'grid3') {
+      switchViewMode('grid2');
+    } else if (currentViewMode === 'grid2') {
+      switchViewMode('3d');
+    } else if (currentViewMode === '3d') {
+      switchViewMode('dual');
+    } else {
+      switchViewMode('grid3');
+    }
   } else {
-    switchViewMode('grid2');
+    // На десктопі: 4 в ряд → 5 в ряд → 3 в ряд → 2 в ряд → Карусель → Порівняння → 4 в ряд
+    if (currentViewMode === 'grid4') {
+      switchViewMode('grid5');
+    } else if (currentViewMode === 'grid5') {
+      switchViewMode('3d');
+    } else if (currentViewMode === '3d') {
+      switchViewMode('dual');
+    } else if (currentViewMode === 'dual') {
+      switchViewMode('grid2');
+    } else if (currentViewMode === 'grid2') {
+      switchViewMode('grid3');
+    } else {
+      switchViewMode('grid4');
+    }
   }
 }
 window.cycleViewMode = cycleViewMode;
@@ -2011,14 +2087,17 @@ function createCardSlot(product, index) {
   imgArea.appendChild(priceBadge);
 
   // Тіло картки: бейдж магазину (🟡 Аврора, 🔴 АТБ, 🟠 Сільпо, 🟢 EVA)
+  const isOutOfStock = product.in_stock === false || product.is_in_stock === false;
+  const isOnlineOnly = Boolean(product.is_only_online || product.is_nova_poshta);
+
   const body = document.createElement('div');
   body.className = 'card-body';
   body.innerHTML = `
     <div class="category-row">
       <span class="category-label ${sm.badgeClass}">${sm.label}</span>
-      <span class="weight-label">${product.weight || ''}</span>
+      ${isOutOfStock ? '<span class="out-of-stock-badge">● Немає в наявності</span>' : (product.weight ? `<span class="weight-label">${product.weight}</span>` : '')}
       ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
-      ${product.is_only_online ? '<span class="online-only-badge">📱 Тільки онлайн</span>' : ''}
+      ${isOnlineOnly ? '<span class="online-only-badge">📱 Замовлення онлайн</span>' : ''}
     </div>
     <div class="product-name" title="${product.title}">${product.title}</div>
   `;
@@ -2474,8 +2553,11 @@ function renderGrid() {
     const isNP = p.is_nova_poshta;
     const npBadge = isNP ? `<div style="background:var(--atb-red); color:white; font-size:10px; font-weight:bold; padding:3px 6px; border-radius:4px; margin-bottom:5px; display:inline-block;">Тільки Нова Пошта</div>` : '';
 
+    const isOutOfStock = p.in_stock === false || p.is_in_stock === false;
+    const isOnlineOnly = Boolean(p.is_only_online || p.is_nova_poshta);
+
     const card = document.createElement('div');
-    card.className = 'grid-product-card';
+    card.className = 'grid-product-card' + (isOutOfStock ? ' out-of-stock' : '');
     card.dataset.productId = p.link || p.product_url || p.title;
     card.innerHTML = `
       <div class="grid-card-img-area">
@@ -2486,11 +2568,11 @@ function renderGrid() {
         <div class="category-row">
           <span class="category-label ${sm.badgeClass}">${sm.label}</span>
           ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
-          ${p.is_only_online ? '<span class="online-only-badge">📱 Тільки онлайн</span>' : ''}
+          ${isOnlineOnly ? '<span class="online-only-badge">📱 Замовлення онлайн</span>' : ''}
         </div>
         <div class="grid-card-title" title="${p.title}">${p.title}</div>
-        <div class="in-stock available">
-          <span>${p.weight ? p.weight : 'В наявності'}</span>
+        <div class="in-stock ${isOutOfStock ? 'unavailable' : 'available'}">
+          ${isOutOfStock ? '<span class="out-of-stock-badge">● Немає в наявності</span>' : `<span>${p.weight ? p.weight : 'В наявності'}</span>`}
         </div>
         ${npBadge}
         <div class="grid-card-price-row">
@@ -2502,7 +2584,7 @@ function renderGrid() {
             <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
               <i class="fa-solid fa-heart"></i>
             </button>
-            <button class="btn-cart" id="cartBtnGrid_${startIndex + idx}" style="padding:8px 12px;" title="Додати у кошик">
+            <button class="btn-cart" id="cartBtnGrid_${startIndex + idx}" style="padding:8px 12px;" title="Додати у кошик" ${isOutOfStock ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : ''}>
               <i class="fa-solid fa-cart-plus"></i>
             </button>
           </div>
@@ -3340,7 +3422,7 @@ window.toggleNovaPoshta = toggleNovaPoshta;
 
 function renderCurrentView() {
   if (currentViewMode === '3d') renderStage();
-  else if (currentViewMode === 'grid2' || currentViewMode === 'grid3') renderGrid();
+  else if (currentViewMode.startsWith('grid')) renderGrid();
   else if (currentViewMode === 'dual') renderDualView();
 }
 window.renderCurrentView = renderCurrentView;

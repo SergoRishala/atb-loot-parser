@@ -298,18 +298,27 @@ def search():
     else:
         selected_stores = set(stores_list)
 
-    # Виявлення слів для точного пошуку в лапках або дужках: "old spice", (old spice), «old spice»
+    # Виявлення слів для точного пошуку:
+    # 1) у лапках або дужках: "old spice", (old spice), «old spice»
+    # 2) або з крапкою перед текстом: .old spice або .мило
+    is_dot_search = raw_query.startswith(".") and len(raw_query) > 1
     quotes_match = re.findall(r'["“«\(]([^"”»\)]+)["”»\)]', raw_query)
     if not quotes_match and raw_query.startswith('"') and raw_query.endswith('"') and len(raw_query) > 2:
         quotes_match = [raw_query[1:-1]]
     
     required_words = []
-    if quotes_match:
+    if is_dot_search:
+        dot_phrase = raw_query[1:].strip()
+        required_words.extend([w.lower() for w in dot_phrase.split() if w])
+    elif quotes_match:
         for phrase in quotes_match:
             required_words.extend([w.lower() for w in phrase.strip().split() if w])
 
     # Очищений запит для передачі у веб-інтерфейси магазинів
-    clean_search_query = re.sub(r'["“«»”\(\)]', ' ', raw_query).strip()
+    clean_search_query = raw_query
+    if is_dot_search:
+        clean_search_query = raw_query[1:].strip()
+    clean_search_query = re.sub(r'["“«»”\(\)]', ' ', clean_search_query).strip()
     clean_search_query = re.sub(r'\s+', ' ', clean_search_query) or raw_query
 
     is_promo_mode = (not clean_search_query or clean_search_query.lower() in ("promotions", "акції", "знижки", "акція") or only_promo)
@@ -622,6 +631,13 @@ def search():
         p["image_url"] = img
         if not p.get("image_large_url"):
             p["image_large_url"] = img
+        if p.get("is_nova_poshta"):
+            p["is_only_online"] = True
+        if "in_stock" not in p:
+            p["in_stock"] = True
+        p["is_in_stock"] = p.get("in_stock", True)
+        if not p.get("weight"):
+            p["weight"] = ""
 
     return jsonify({
         "success": True,

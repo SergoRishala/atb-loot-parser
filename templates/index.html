@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
-  <link rel="stylesheet" href="/static/style.css?v=6.0"/>
+  <link rel="stylesheet" href="/static/style.css?v=7.0"/>
   <link rel="icon" href="https://silpo.ua/favicon.ico" type="image/x-icon"/>
   <!-- Штрихкод сканер бібліотека -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -68,6 +68,15 @@
     <span class="selected-categories-label">Обрана категорія:</span>
     <div id="selectedCategoriesList" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
   </div>
+</div>
+
+<!-- 3.5. ШВИДКІ ВКЛАДКИ МАГАЗИНІВ ТА АКЦІЙ -->
+<div class="quick-store-tabs" style="display:flex; gap:8px; justify-content:center; align-items:center; margin:8px auto 14px; max-width:960px; padding:0 12px; flex-wrap:wrap;">
+  <button class="pill-btn active" id="tabMainStoreAll" onclick="selectSingleStoreTab('all')">🛍️ Всі магазини</button>
+  <button class="pill-btn pill-avrora" id="tabMainStoreAvrora" onclick="selectSingleStoreTab('avrora')">🟡 Аврора</button>
+  <button class="pill-btn pill-atb" id="tabMainStoreAtb" onclick="selectSingleStoreTab('atb')">🔴 АТБ</button>
+  <button class="pill-btn pill-silpo" id="tabMainStoreSilpo" onclick="selectSingleStoreTab('silpo')">🟠 Сільпо</button>
+  <button class="pill-btn pill-eva" id="tabMainStoreEva" onclick="selectSingleStoreTab('eva')">🟢 Всі акції EVA</button>
 </div>
 
 <!-- 4. ПОШУК ТА КНОПКИ ДІЙ (ВИГЛЯД, ФІЛЬТР, СОРТУВАННЯ) -->
@@ -531,11 +540,19 @@
         <div style="display:flex; flex-direction:column; gap:8px;">
           <div class="admin-option-btn" onclick="switchViewMode('grid2'); closeAdminPanel();">
             <i class="fa-solid fa-table-cells-large" style="color:var(--primary); font-size:16px;"></i>
-            <span>2 товари в ряд (за замовчуванням)</span>
+            <span>2 товари в ряд</span>
           </div>
           <div class="admin-option-btn" onclick="switchViewMode('grid3'); closeAdminPanel();">
             <i class="fa-solid fa-table-cells" style="color:var(--primary); font-size:16px;"></i>
-            <span>3 товари в ряд</span>
+            <span>3 товари в ряд (за замовчуванням для тел.)</span>
+          </div>
+          <div class="admin-option-btn" onclick="switchViewMode('grid4'); closeAdminPanel();">
+            <i class="fa-solid fa-border-all" style="color:var(--primary); font-size:16px;"></i>
+            <span>4 товари в ряд (ПК / планшет)</span>
+          </div>
+          <div class="admin-option-btn" onclick="switchViewMode('grid5'); closeAdminPanel();">
+            <i class="fa-solid fa-grip" style="color:var(--primary); font-size:16px;"></i>
+            <span>5 товарів в ряд (великий екран)</span>
           </div>
           <div class="admin-option-btn" onclick="switchViewMode('3d'); closeAdminPanel();">
             <i class="fa-solid fa-cube" style="color:var(--primary); font-size:16px;"></i>
@@ -934,6 +951,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=6.0"></script>
+<script src="/static/app.js?v=7.0"></script>
 </body>
 </html>

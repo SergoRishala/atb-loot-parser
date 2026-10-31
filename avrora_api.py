@@ -38,24 +38,27 @@ logger = logging.getLogger(__name__)
 
 def _get(url: str, params: Optional[Dict] = None, timeout: int = REQUEST_TIMEOUT) -> Optional[str]:
     """HTTP GET з curl-cffi (обхід Cloudflare) або fallback на requests."""
-    try:
-        if _USE_CFFI:
-            r = cffi_requests.get(
-                url,
-                params=params,
-                headers=HEADERS,
-                impersonate="chrome120",
-                timeout=timeout,
-                allow_redirects=True,
-            )
-        else:
-            import requests
-            r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
-        if r.status_code == 200:
-            return r.text
-        logger.warning("Avrora GET %s → HTTP %s", url, r.status_code)
-    except Exception as exc:
-        logger.error("Avrora GET %s → %s", url, exc)
+    for impersonation in ["safari15_5", "chrome120", "chrome110"]:
+        try:
+            if _USE_CFFI:
+                r = cffi_requests.get(
+                    url,
+                    params=params,
+                    headers=HEADERS,
+                    impersonate=impersonation,
+                    timeout=timeout,
+                    allow_redirects=True,
+                )
+            else:
+                import requests
+                r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
+            if r.status_code == 200:
+                return r.text
+            if r.status_code != 403:
+                logger.warning("Avrora GET %s → HTTP %s", url, r.status_code)
+                break
+        except Exception as exc:
+            logger.error("Avrora GET %s (%s) → %s", url, impersonation, exc)
     return None
 
 
@@ -129,21 +132,17 @@ def _parse_card(card) -> Optional[Dict[str, Any]]:
         elif image and image.startswith("/"):
             image = BASE_URL + image
 
-        # Стара ціна: .ty-list-price → перший .ty-price-num з числом
-        old_price_nums = card.select(".ty-list-price .ty-price-num")
-        old_price = None
-        for el in old_price_nums:
-            v = _to_float(el.get_text(strip=True))
-            if v:
-                old_price = v
-                break
+        # Стара ціна: шукаємо елемент зі старою ціною (закресленою)
+        # В HTML Аврори це span[id^="sec_list_price_"], span[id^="sec_old_price_"], .ty-strike або .ty-list-price
+        old_el = card.select_one('[id^="sec_list_price_"], [id^="sec_old_price_"], .ty-strike, [id^="old_price_update_"] .ty-list-price, .ty-list-price')
+        old_price = _to_float(old_el.get_text(strip=True)) if old_el else None
 
-        # Нова ціна: .ty-price-update .ty-price-num або перший .ty-price .ty-price-num
-        new_price_el = card.select_one(".ty-price-update .ty-price-num, .ty-price-num")
+        # Нова ціна: [id^="sec_discounted_price_"], .ty-price-update .ty-price-num або перший .ty-price-num
+        new_price_el = card.select_one('[id^="sec_discounted_price_"], .ty-price-update .ty-price-num, .ty-price-num')
         new_price = _to_float(new_price_el.get_text(strip=True)) if new_price_el else None
 
-        # Якщо тільки одна ціна в картці — то це і є поточна ціна (без знижки)
-        if old_price and new_price and old_price == new_price:
+        # Якщо тільки одна ціна в картці або стара менша/рівна новій — stara скидається
+        if old_price and new_price and old_price <= new_price:
             old_price = None
 
         # Знижка

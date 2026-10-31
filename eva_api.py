@@ -191,7 +191,32 @@ def _parse_card(card) -> Optional[Dict[str, Any]]:
 
         has_discount = bool(discount_pct and discount_pct > 0)
         saving = round(old_price - new_price, 2) if (old_price and new_price and old_price > new_price) else None
+        
+        # Об'єм / вага (з назви або з міні-свотчів на картці товару EVA)
         weight = _extract_weight(title)
+        if not weight:
+            for sw in card.select("[data-testid*='swatch-label'], [class*='swatch'] span, .m-mini-swatches span, .m-mini-swatches div"):
+                sw_text = _clean(sw.get_text(strip=True))
+                if any(u in sw_text.lower() for u in WEIGHT_UNITS) and re.search(r'\d', sw_text):
+                    weight = sw_text
+                    break
+
+        # Наявність товару (В наявності / Немає в наявності)
+        card_full_text = card.get_text(" ", strip=True).lower()
+        is_out_of_stock = (
+            "немає в наявності" in card_full_text
+            or "немає на складі" in card_full_text
+            or ("сповістити" in card_full_text and "до кошика" not in card_full_text)
+        )
+        in_stock = not is_out_of_stock
+
+        # Замовлення онлайн / тільки на сайті
+        is_only_online = (
+            "доставка 0" in card_full_text
+            or "на сайті" in card_full_text
+            or "тільки на сайті" in card_full_text
+            or "тільки онлайн" in card_full_text
+        )
 
         return {
             "title": title,
@@ -204,7 +229,11 @@ def _parse_card(card) -> Optional[Dict[str, Any]]:
             "image_url": image,
             "image_large_url": image,
             "product_url": link,
+            "link": link,
             "weight": weight,
+            "in_stock": in_stock,
+            "is_in_stock": in_stock,
+            "is_only_online": is_only_online,
             "store": "eva",
         }
     except Exception as exc:
@@ -232,37 +261,80 @@ def _parse_page(html: str) -> List[Dict[str, Any]]:
 #   ПУБЛІЧНЕ API
 # ─────────────────────────────────────────────
 
+_campaigns_cache = {
+    "timestamp": 0,
+    "urls": []
+}
+
+def get_eva_promotion_campaigns(timeout: int = REQUEST_TIMEOUT) -> List[str]:
+    """
+    Отримує список посилань на діючі акції з https://eva.ua/ua/promotion/
+    Кешує результат на 15 хвилин.
+    """
+    global _campaigns_cache
+    now = time.time()
+    if _campaigns_cache["urls"] and (now - _campaigns_cache["timestamp"] < 900):
+        return _campaigns_cache["urls"]
+
+    html = _get(f"{BASE_URL}/ua/promotion/", timeout=timeout)
+    if not html:
+        return _campaigns_cache["urls"] or []
+
+    matches = re.findall(r'href=[\"\x27](/ua/promotion/[a-z0-9\-]+/)[\"\x27]', html)
+    campaigns = [m for m in sorted(list(set(matches))) if not m.startswith("/ua/promotion/type/")]
+    if campaigns:
+        _campaigns_cache["urls"] = campaigns
+        _campaigns_cache["timestamp"] = now
+    return campaigns
+
+
 def get_eva_promos(page: int = 1, timeout: int = REQUEST_TIMEOUT) -> List[Dict[str, Any]]:
     """
-    Завантажує акційні товари EVA з категорій за ротацією сторінок.
+    Завантажує всі акційні товари з акційних сторінок EVA (https://eva.ua/ua/promotion/...).
+    Підтримує пагінацію по всіх діючих промо-кампаніях EVA.
     """
-    cat_start = ((page - 1) * 2) % len(PROMO_CATEGORIES)
-    cats = PROMO_CATEGORIES[cat_start:cat_start + 2]
+    campaigns = get_eva_promotion_campaigns(timeout=timeout)
     results = []
     seen = set()
 
-    # Також на першій сторінці додаємо головну eva.ua/ua/
-    if page == 1:
-        home_html = _get(f"{BASE_URL}/ua/", timeout=timeout)
-        if home_html:
-            for item in _parse_page(home_html):
+    if campaigns:
+        campaigns_per_page = 2
+        start_idx = ((page - 1) * campaigns_per_page) % len(campaigns)
+        selected_campaigns = campaigns[start_idx : start_idx + campaigns_per_page]
+
+        from concurrent.futures import ThreadPoolExecutor
+        def _fetch_camp(camp_path):
+            camp_url = BASE_URL + camp_path
+            camp_html = _get(camp_url, timeout=timeout)
+            if camp_html:
+                return _parse_page(camp_html)
+            return []
+
+        with ThreadPoolExecutor(max_workers=min(4, len(selected_campaigns))) as ex:
+            for items in ex.map(_fetch_camp, selected_campaigns):
+                for item in items:
+                    key = item.get("product_url") or item.get("title")
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(item)
+
+    # Якщо з кампаній повернулось мало або порожньо — добираємо з категорій знижок
+    if len(results) < 20:
+        cat_start = ((page - 1) * 2) % len(PROMO_CATEGORIES)
+        cats = PROMO_CATEGORIES[cat_start : cat_start + 2]
+        for cat_path in cats:
+            url = BASE_URL + cat_path
+            html = _get(url, timeout=timeout)
+            if not html:
+                continue
+            items = _parse_page(html)
+            for item in items:
                 key = item.get("product_url") or item.get("title")
                 if key not in seen:
                     seen.add(key)
                     results.append(item)
 
-    for cat_path in cats:
-        url = BASE_URL + cat_path
-        html = _get(url, timeout=timeout)
-        if not html:
-            continue
-        items = _parse_page(html)
-        for item in items:
-            key = item.get("product_url") or item.get("title")
-            if key not in seen:
-                seen.add(key)
-                results.append(item)
-        logger.info("EVA категорія %s: %d товарів", cat_path, len(items))
+    return results
 
     return results
 

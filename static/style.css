@@ -2927,7 +2927,7 @@ body {
   border-color: var(--primary);
 }
 
-/* 3. Кількість товарів у ряд: 2 або 3 */
+/* 3. Кількість товарів у ряд: 2, 3, 4, 5 */
 .products-grid.cols-2 {
   grid-template-columns: repeat(2, 1fr) !important;
 }
@@ -2936,10 +2936,100 @@ body {
   grid-template-columns: repeat(3, 1fr) !important;
 }
 
-@media (max-width: 640px) {
+.products-grid.cols-4 {
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 12px !important;
+}
+.products-grid.cols-4 .grid-card-img-area {
+  height: 140px !important;
+}
+.products-grid.cols-4 .grid-card-title {
+  font-size: 12px !important;
+}
+.products-grid.cols-4 .grid-card-price {
+  font-size: 15px !important;
+}
+
+.products-grid.cols-5 {
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 10px !important;
+}
+.products-grid.cols-5 .grid-card-img-area {
+  height: 125px !important;
+}
+.products-grid.cols-5 .grid-card-title {
+  font-size: 11.5px !important;
+}
+.products-grid.cols-5 .grid-card-price {
+  font-size: 14px !important;
+}
+
+/* На мобільних екранах: пропорційне зменшення для 3 товарів у рядку */
+@media (max-width: 768px) {
   .products-grid.cols-3 {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    padding: 6px 4px !important;
   }
+  .products-grid.cols-3 .grid-product-card {
+    padding: 6px !important;
+    border-radius: 12px !important;
+  }
+  .products-grid.cols-3 .grid-card-img-area {
+    height: 92px !important;
+    margin-bottom: 4px !important;
+  }
+  .products-grid.cols-3 .grid-card-title {
+    font-size: 11px !important;
+    line-height: 1.22 !important;
+    height: 27px !important;
+    -webkit-line-clamp: 2 !important;
+    margin-bottom: 2px !important;
+  }
+  .products-grid.cols-3 .grid-card-price {
+    font-size: 13px !important;
+  }
+  .products-grid.cols-3 .grid-card-old-price {
+    font-size: 10px !important;
+  }
+  .products-grid.cols-3 .category-label,
+  .products-grid.cols-3 .unit-price-pill,
+  .products-grid.cols-3 .online-only-badge,
+  .products-grid.cols-3 .out-of-stock-badge {
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+  }
+  .products-grid.cols-3 .in-stock span {
+    font-size: 9.5px !important;
+  }
+  .products-grid.cols-3 .btn-cart {
+    padding: 5px 8px !important;
+    font-size: 11px !important;
+  }
+  .products-grid.cols-3 .btn-wish-mini {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 11px !important;
+  }
+  .products-grid.cols-4,
+  .products-grid.cols-5 {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+}
+
+/* Бейдж наявності: Немає в наявності */
+.out-of-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fef2f2 !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 
 /* 4. Компактна пагінація: 1 2 3 4 5 ... */
