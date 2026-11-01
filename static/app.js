@@ -2608,9 +2608,7 @@ function renderGrid() {
       <div class="bs front">
         <div class="c">
           <div class="h"><b>${storeHeader}</b> <span class="rl">· ${tagText}</span></div>
-          <div class="im">
-            <img src="${imgSrc || FALLBACK_SVG}" alt="${p.title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
-          </div>
+          <div class="im" style="background-image: url('${imgSrc || FALLBACK_SVG}')" aria-label="${p.title}"></div>
           <div class="nm" title="${p.title}">${p.title}</div>
           <div class="rw"><span class="l">ОБСЯГ</span><span class="v">${weightVal}</span></div>
           <div class="rw"><span class="l">${unitLabel}</span><span class="v">${unitVal}</span></div>
@@ -2621,14 +2619,14 @@ function renderGrid() {
             <div class="p">
               <span class="m">${price.toFixed(2)} ₴</span>
             </div>
-            <div class="ft-actions">
-              <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
-                <i class="fa-solid fa-heart"></i>
-              </button>
-              <button class="btn-cart" id="cartBtnGrid_${startIndex + idx}" title="Додати у кошик" ${isOutOfStock ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-                <i class="fa-solid fa-cart-plus"></i>
-              </button>
-            </div>
+          </div>
+          <div class="ticket-actions-float">
+            <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
+              <i class="fa-solid fa-heart"></i>
+            </button>
+            <button class="btn-cart-ticket" id="cartBtnGrid_${startIndex + idx}" title="Додати у кошик" ${isOutOfStock ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+              <i class="fa-solid fa-cart-plus"></i>
+            </button>
           </div>
         </div>
       </div>
