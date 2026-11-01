@@ -2541,52 +2541,94 @@ function renderGrid() {
     return;
   }
 
-  // Рендеримо ТІЛЬКИ 100 товарів поточної вкладки
+  // Рендеримо ТІЛЬКИ 100 товарів поточної вкладки у стилі ретро-чеків/квитків
   pageItems.forEach((p, idx) => {
-    const sm = getStoreMeta(p.store);
-    const isAtb = p.store === 'atb';
+    const rawStore = (p.store || 'atb').toLowerCase();
+    const isAtb = rawStore === 'atb';
+    const isSilpo = rawStore === 'silpo';
+    const isAvrora = rawStore === 'avrora';
+    const isEva = rawStore === 'eva';
+
     const price = typeof p.price === 'number' ? p.price : parseFloat(p.price || 0);
     const oldPrice = p.old_price ? parseFloat(p.old_price) : null;
     const unitPrice = calculateUnitPrice(p.title, p.weight, price);
     const imgSrc = getProductImg(p);
     const inWish = wishlist.some(w => (w.link || w.title) === (p.link || p.title));
-    const isNP = p.is_nova_poshta;
-    const npBadge = isNP ? `<div style="background:var(--atb-red); color:white; font-size:10px; font-weight:bold; padding:3px 6px; border-radius:4px; margin-bottom:5px; display:inline-block;">Тільки Нова Пошта</div>` : '';
 
     const isOutOfStock = p.in_stock === false || p.is_in_stock === false;
     const isOnlineOnly = Boolean(p.is_only_online || p.is_nova_poshta);
 
+    // 1. Заголовок квитка: Мережа + статус/тег
+    let storeHeader = 'АТБ';
+    if (isSilpo) storeHeader = 'СІЛЬПО';
+    else if (isAvrora) storeHeader = 'АВРОРА';
+    else if (isEva) storeHeader = '<span style="color:#d7752c">E</span>VA';
+    else storeHeader = rawStore.toUpperCase();
+
+    let tagText = 'МАГАЗИН';
+    if (isOutOfStock) {
+      tagText = '<span style="color:#ef4444; font-weight:700;">НЕМАЄ</span>';
+    } else if (p.is_nova_poshta) {
+      tagText = 'НОВА ПОШТА';
+    } else if (isOnlineOnly) {
+      tagText = 'ОНЛАЙН';
+    }
+
+    // 2. Рядок обсягу / ваги
+    const weightVal = p.weight ? p.weight : (p.unit ? p.unit : '—');
+
+    // 3. Рядок за 100 мл/г або категорія/бренд
+    let unitLabel = 'ЗА 100 г';
+    let unitVal = '—';
+    if (unitPrice) {
+      unitLabel = `ЗА 100 ${unitPrice.unit || 'г'}`;
+      unitVal = `${unitPrice.value ? unitPrice.value.toFixed(2) : unitPrice.text} ₴`;
+    } else if (p.brand) {
+      unitLabel = 'БРЕНД';
+      unitVal = p.brand;
+    } else {
+      unitLabel = 'СТАТУС';
+      unitVal = isOutOfStock ? '<span style="color:#ef4444">НЕМАЄ</span>' : 'В НАЯВНОСТІ';
+    }
+
+    // 4. Рядок старої ціни (БУЛО)
+    const oldPriceHtml = oldPrice && oldPrice > price ? `<s>${oldPrice.toFixed(2)} ₴</s>` : '<span style="color:#a5887e">—</span>';
+
+    // 5. Знижка
+    const discount = p.discount_percent && p.discount_percent > 3 ? p.discount_percent : (
+      oldPrice && oldPrice > price ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0
+    );
+    const discountBadgeHtml = discount > 3 ? `<span class="d">-${discount}%</span>` : `<span class="d" style="visibility:hidden; width:0; padding:0; border:none;"></span>`;
+
     const card = document.createElement('div');
-    card.className = 'grid-product-card' + (isOutOfStock ? ' out-of-stock' : '');
+    card.className = `grid-product-card st ${rawStore}` + (isOutOfStock ? ' out-of-stock' : '');
     card.dataset.productId = p.link || p.product_url || p.title;
     card.innerHTML = `
-      <div class="grid-card-img-area">
-        <img class="grid-card-img" src="${imgSrc || FALLBACK_SVG}" alt="${p.title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
-        ${p.discount_percent && p.discount_percent > 5 ? `<div class="card-discount-badge">-${p.discount_percent}%</div>` : ''}
-      </div>
-      <div class="grid-card-body">
-        <div class="category-row">
-          <span class="category-label ${sm.badgeClass}">${sm.label}</span>
-          ${unitPrice ? `<span class="unit-price-pill" title="Чесна ціна за 100 г">⚖️ ${unitPrice.text}</span>` : ''}
-          ${isOnlineOnly ? '<span class="online-only-badge">📱 Замовлення онлайн</span>' : ''}
-        </div>
-        <div class="grid-card-title" title="${p.title}">${p.title}</div>
-        <div class="in-stock ${isOutOfStock ? 'unavailable' : 'available'}">
-          ${isOutOfStock ? '<span class="out-of-stock-badge">● Немає в наявності</span>' : `<span>${p.weight ? p.weight : 'В наявності'}</span>`}
-        </div>
-        ${npBadge}
-        <div class="grid-card-price-row">
-          <div>
-            <span class="grid-card-price">${price.toFixed(2)} ₴</span>
-            ${oldPrice && oldPrice > price ? `<span class="grid-card-old-price">${oldPrice.toFixed(2)} ₴</span>` : ''}
+      <div class="bs back"></div>
+      <div class="bs front">
+        <div class="c">
+          <div class="h"><b>${storeHeader}</b> <span class="rl">· ${tagText}</span></div>
+          <div class="im">
+            <img src="${imgSrc || FALLBACK_SVG}" alt="${p.title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_SVG}';"/>
           </div>
-          <div style="display:flex; gap:6px;">
-            <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
-              <i class="fa-solid fa-heart"></i>
-            </button>
-            <button class="btn-cart" id="cartBtnGrid_${startIndex + idx}" style="padding:8px 12px;" title="Додати у кошик" ${isOutOfStock ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : ''}>
-              <i class="fa-solid fa-cart-plus"></i>
-            </button>
+          <div class="nm" title="${p.title}">${p.title}</div>
+          <div class="rw"><span class="l">ОБСЯГ</span><span class="v">${weightVal}</span></div>
+          <div class="rw"><span class="l">${unitLabel}</span><span class="v">${unitVal}</span></div>
+          <div class="rw"><span class="l">БУЛО</span><span class="v">${oldPriceHtml}</span></div>
+          <div class="dv"></div>
+          <div class="ft">
+            ${discountBadgeHtml}
+            <div class="p">
+              <span class="m">${price.toFixed(2)} ₴</span>
+            </div>
+            <div class="ft-actions">
+              <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
+                <i class="fa-solid fa-heart"></i>
+              </button>
+              <button class="btn-cart" id="cartBtnGrid_${startIndex + idx}" title="Додати у кошик" ${isOutOfStock ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+                <i class="fa-solid fa-cart-plus"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>

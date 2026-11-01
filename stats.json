@@ -1,11 +1,153 @@
 {
   "summary": {
-    "total_visits": 0,
-    "unique_visitors": 0,
-    "total_searches": 0,
+    "total_visits": 2,
+    "unique_visitors": 1,
+    "total_searches": 7,
     "total_clicks": 0
   },
-  "visitors": {},
-  "search_queries": {},
-  "recent_events": []
+  "visitors": {
+    "usr_juhoh9_iv2aj": {
+      "first_seen": "2026-10-31 20:06:13",
+      "last_seen": "2026-10-31 20:44:09",
+      "visit_count": 2,
+      "ip": "127.0.0.1",
+      "device_fingerprint": "fp_juhoh9",
+      "is_bot": false,
+      "device": {
+        "type": "Комп'ютер",
+        "model": "Apple Mac",
+        "os": "macOS",
+        "osVersion": "10.15.7",
+        "browser": "Safari",
+        "browserVersion": "18.6",
+        "gpu": "Apple GPU",
+        "screenResolution": "1920×1200",
+        "viewportSize": "1920×1120",
+        "pixelRatio": "2.0",
+        "lang": "uk-UA",
+        "langs": "uk-UA",
+        "timezone": "Europe/Kiev",
+        "colorScheme": "Темна",
+        "connection": "Невідомо",
+        "hasTouch": false,
+        "touchPoints": 0,
+        "battery": "Не підтримується браузером",
+        "referrer": "Прямий перехід",
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15"
+      },
+      "searches": [
+        "щд",
+        "old",
+        "old s",
+        "old sp",
+        "old spice",
+        "/old spice",
+        ".old spice"
+      ],
+      "clicks_count": 0,
+      "products_viewed": 0,
+      "total_session_sec": 34143
+    }
+  },
+  "search_queries": {
+    "щд": 1,
+    "old": 1,
+    "old s": 1,
+    "old sp": 1,
+    "old spice": 1,
+    "/old spice": 1,
+    ".old spice": 1
+  },
+  "recent_events": [
+    {
+      "time": "2026-10-31 20:10:13",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «.old spice»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:10:12",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «/old spice»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:09:54",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «old spice»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:09:53",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «old sp»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:09:51",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «old s»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:09:50",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «old»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:09:48",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «щд»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:08:40",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-10-31 20:06:13",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    }
+  ]
 }
