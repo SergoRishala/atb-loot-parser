@@ -1690,6 +1690,16 @@ body {
 ═══════════════════════════════════════════ */
 :root {
   --ink: #4a1018;
+  --ease: cubic-bezier(.22, .9, .28, 1);  /* крива руху */
+  --T: .8s;                            /* тривалість переходу між рівнями */
+  /* рівень 1: фото 280px (280/150), без шапки */
+  --s1: 1.8667; --y1: -49px;           /* масштаб і підйом фото до верху картки */
+  --sh1: 80px;                        /* зсув лінії й назви вниз: під фото, без перекриття */
+  /* рівень 2: фото 230px (230/150), з шапкою */
+  --s2: 1.5333; --sh2: 80px;           /* 150 × (1.5333 − 1) */
+  /* рівень 3: фото 150px, повна картка (scale 1, зсув 0) */
+  --s3: 1; --sh3: 0px;                 /* рівень 3: фото 150px (scale 1), без зсуву */
+  --g1: 71%; --g2: 71%; --g3: 62%;      /* градієнт: де закінчується біле, на рівнях 1 / 2 / 3 */
 }
 
 .atb, .st.atb {
@@ -1793,17 +1803,29 @@ body {
   filter: drop-shadow(3px 6px 9px rgba(0,0,0,.3)) !important;
 }
 
+/* градієнт по рівнях: --g1 / --g2 / --g3 (плавно) */
+@property --gs { syntax: '<percentage>'; inherits: false; initial-value: 71%; }
 .c {
   position: relative !important;
   width: 280px !important;
   height: 405px !important;
   color: var(--ink) !important;
-  background: linear-gradient(180deg,#fff 62%,var(--end) 100%) !important;
+  --gs: var(--g1);
+  background: linear-gradient(180deg, #fff var(--gs), var(--end) 100%) !important;
   clip-path: polygon(0 0,100% 0,100% calc(100% - 7px),93.75% 100%,87.5% calc(100% - 7px),81.25% 100%,75% calc(100% - 7px),68.75% 100%,62.5% calc(100% - 7px),56.25% 100%,50% calc(100% - 7px),43.75% 100%,37.5% calc(100% - 7px),31.25% 100%,25% calc(100% - 7px),18.75% 100%,12.5% calc(100% - 7px),6.25% 100%,0 calc(100% - 7px)) !important;
   -webkit-mask: radial-gradient(circle 23px at 0 124px,#0000 97%,#000),radial-gradient(circle 23px at 100% 124px,#0000 97%,#000) !important;
   -webkit-mask-composite: source-in,source-in !important;
   mask: radial-gradient(circle 23px at 0 124px,#0000 97%,#000),radial-gradient(circle 23px at 100% 124px,#0000 97%,#000) !important;
   mask-composite: intersect !important;
+  transition: --gs var(--T) var(--ease) !important;
+}
+
+.st.l2 .c {
+  --gs: var(--g2) !important;
+}
+
+.st.open .c {
+  --gs: var(--g3) !important;
 }
 
 .c > * {
@@ -1820,6 +1842,10 @@ body {
   font-size: 14px !important;
   line-height: 18px !important;
   letter-spacing: 0.5px !important;
+  padding: 0 16px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .h b {
@@ -1833,6 +1859,25 @@ body {
   opacity: .7 !important;
 }
 
+/* шапка "АТБ · ОНЛАЙН" і верхня лінія: з'являються з рівня 2 */
+.t {
+  opacity: 0 !important;
+  transition: opacity .5s ease !important;
+}
+
+.rl.t {
+  opacity: 0 !important;
+}
+
+.st.l2 .t {
+  opacity: 1 !important;
+}
+
+.st.l2 .rl.t {
+  opacity: .7 !important;
+}
+
+/* фото: 280 -> 230 -> 150 (верх фото фіксований, масштаб від верху) */
 .im {
   top: 49px !important;
   left: 65px !important;
@@ -1841,11 +1886,31 @@ body {
   background-size: contain !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
-  transition: transform 0.25s ease !important;
+  transform: translateY(var(--y1)) scale(var(--s1)) !important;
+  transform-origin: 50% 0 !important;
+  transition: transform var(--T) var(--ease) !important;
 }
 
-.st:hover .im {
-  transform: scale(1.05) !important;
+.st.l2 .im {
+  transform: translateY(0) scale(var(--s2)) !important;
+}
+
+.st.open .im {
+  transform: translateY(0) scale(var(--s3)) !important;
+}
+
+/* друга пунктирна лінія і назва: 25px -> 80px -> 0 */
+.mv {
+  transform: translateY(var(--sh1)) !important;
+  transition: transform var(--T) var(--ease) !important;
+}
+
+.st.l2 .mv {
+  transform: translateY(var(--sh2)) !important;
+}
+
+.st.open .mv {
+  transform: translateY(var(--sh3)) !important;
 }
 
 .nm {
@@ -1864,13 +1929,41 @@ body {
   color: var(--ink) !important;
 }
 
+/* Рядки характеристик, нижній пунктир і ціна з'являються каскадом при .open */
+.x {
+  opacity: 0 !important;
+  transform: translateY(12px) !important;
+  pointer-events: none !important;
+  transition: opacity .2s ease, transform .2s ease !important;
+}
+
+.st.open .x {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: opacity .45s ease var(--d), transform .55s var(--ease) var(--d) !important;
+  pointer-events: auto !important;
+}
+
+.rl.x {
+  opacity: 0 !important;
+}
+
+.st.open .rl.x {
+  opacity: .7 !important;
+}
+
 .rw {
+  left: 16px !important;
+  right: 16px !important;
   font-size: 12px !important;
   line-height: 16px !important;
-  right: 16px !important;
   display: flex !important;
   justify-content: space-between !important;
   color: var(--ink) !important;
+}
+
+.r {
+  font-weight: 700 !important;
 }
 
 .rw s {
@@ -1894,6 +1987,29 @@ body {
   color: var(--dc) !important;
 }
 
+.st.open .pc span:first-child {
+  animation: pop .6s var(--ease) .55s both !important;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: .01s !important;
+    animation: none !important;
+    transition-delay: 0s !important;
+  }
+}
+
 /* Плаваючі кнопки бажаного та кошика у верхньому кутку квитка */
 .ticket-actions-float {
   position: absolute !important;
@@ -1902,7 +2018,15 @@ body {
   left: auto !important;
   display: flex !important;
   gap: 6px !important;
-  z-index: 10 !important;
+  z-index: 20 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.st:hover .ticket-actions-float {
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .ticket-actions-float .btn-wish-mini {

@@ -2558,16 +2558,25 @@ function renderGrid() {
     const isOutOfStock = p.in_stock === false || p.is_in_stock === false;
     const isOnlineOnly = Boolean(p.is_only_online || p.is_nova_poshta);
 
-    // 1. Заголовок квитка: Мережа + статус/тег
+    // 1. Заголовок квитка: Мережа + статус/тег та фірмові кольори
     let storeHeader = 'АТБ';
-    if (isSilpo) storeHeader = 'СІЛЬПО';
-    else if (isAvrora) storeHeader = 'АВРОРА';
-    else if (isEva) storeHeader = '<span style="color:#d7752c">E</span>VA';
-    else storeHeader = rawStore.toUpperCase();
+    let storeCss = '--sc:#e8192c;--back:#ffcfd5;--end:#ffcfd5;--dc:#b4182a';
+    if (isSilpo) {
+      storeHeader = 'Сільпо';
+      storeCss = '--sc:#d7752c;--back:#faddb4;--end:#faddb4;--dc:#d7752c';
+    } else if (isAvrora) {
+      storeHeader = 'Аврора';
+      storeCss = '--sc:#d09c35;--back:#fbeca7;--end:#fcef97;--dc:#d09c35';
+    } else if (isEva) {
+      storeHeader = '<span style="color:#d7752c">E</span>VA';
+      storeCss = '--sc:#46974a;--back:#faddb4;--end:#d0eed6;--dc:#46974a';
+    } else {
+      storeHeader = rawStore.toUpperCase();
+    }
 
     let tagText = 'МАГАЗИН';
     if (isOutOfStock) {
-      tagText = '<span style="color:#ef4444; font-weight:700;">НЕМАЄ</span>';
+      tagText = '<span style="color:#ef4444; font-weight:700;">НЕ В НАЯВНОСТІ</span>';
     } else if (p.is_nova_poshta) {
       tagText = 'НОВА ПОШТА';
     } else if (isOnlineOnly) {
@@ -2588,37 +2597,38 @@ function renderGrid() {
       unitVal = p.brand;
     } else {
       unitLabel = 'СТАТУС';
-      unitVal = isOutOfStock ? '<span style="color:#ef4444">НЕМАЄ</span>' : 'В НАЯВНОСТІ';
+      unitVal = isOutOfStock ? '<span style="color:#ef4444">НЕ В НАЯВНОСТІ</span>' : 'В НАЯВНОСТІ';
     }
 
     // 4. Рядок старої ціни (БУЛО)
-    const oldPriceHtml = oldPrice && oldPrice > price ? `<s>${oldPrice.toFixed(2)} ₴</s>` : '<span style="color:#a5887e">—</span>';
+    const oldPriceHtml = oldPrice && oldPrice > price ? `<s class="r">${oldPrice.toFixed(2)} ₴</s>` : '<span class="r" style="color:#a5887e;">—</span>';
 
     // 5. Знижка
     const discount = p.discount_percent && p.discount_percent > 3 ? p.discount_percent : (
       oldPrice && oldPrice > price ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0
     );
-    const discountBadgeHtml = discount > 3 ? `<span class="d">-${discount}%</span>` : `<span class="d" style="visibility:hidden; width:0; padding:0; border:none;"></span>`;
+    const discountBadgeHtml = discount > 3 ? `<span>-${discount}%</span>` : `<span></span>`;
 
     const card = document.createElement('div');
     card.className = `grid-product-card st ${rawStore}` + (isOutOfStock ? ' out-of-stock' : '');
+    card.style.cssText = storeCss;
     card.dataset.productId = p.link || p.product_url || p.title;
     card.innerHTML = `
       <div class="bs back"></div>
       <div class="bs front">
         <div class="c">
-          <div class="h"><b>${storeHeader}</b> <span class="rl">· ${tagText}</span></div>
-          <div class="im" style="background-image: url('${imgSrc || FALLBACK_SVG}')" aria-label="${p.title}"></div>
-          <div class="nm" title="${p.title}">${p.title}</div>
-          <div class="rw"><span class="l">ОБСЯГ</span><span class="v">${weightVal}</span></div>
-          <div class="rw"><span class="l">${unitLabel}</span><span class="v">${unitVal}</span></div>
-          <div class="rw"><span class="l">БУЛО</span><span class="v">${oldPriceHtml}</span></div>
-          <div class="dv"></div>
-          <div class="ft">
+          <div class="h t"><b>${storeHeader}</b> · ${tagText}</div>
+          <div class="rl t" style="top:41px"></div>
+          <div class="im" role="img" aria-label="${p.title}" style="background-image: url('${imgSrc || FALLBACK_SVG}')"></div>
+          <div class="rl mv" style="top:207px"></div>
+          <div class="nm mv" title="${p.title}">${p.title}</div>
+          <div class="rw x" style="top:276.4px;--d:.22s"><span>ОБСЯГ</span><span class="r">${weightVal}</span></div>
+          <div class="rw x" style="top:300px;--d:.29s"><span>${unitLabel}</span><span class="r">${unitVal}</span></div>
+          <div class="rw x" style="top:323px;--d:.36s"><span>БУЛО</span>${oldPriceHtml}</div>
+          <div class="rl x" style="top:346px;--d:.42s"></div>
+          <div class="pc x" style="top:353.9px;--d:.5s">
             ${discountBadgeHtml}
-            <div class="p">
-              <span class="m">${price.toFixed(2)} ₴</span>
-            </div>
+            <span class="r">${price.toFixed(2)} ₴</span>
           </div>
           <div class="ticket-actions-float">
             <button class="btn-wish-mini ${inWish ? 'active' : ''}" id="wishBtnGrid_${startIndex + idx}" title="В бажане">
@@ -2653,6 +2663,10 @@ function renderGrid() {
 
   // Нижня пагінація вкладками
   renderGridBottomPagination(totalTabs, totalItems);
+
+  if (typeof window.updateCardAnimations === 'function') {
+    window.updateCardAnimations();
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -4466,3 +4480,41 @@ async function resetAdminStats() {
   }
 }
 window.resetAdminStats = resetAdminStats;
+
+/* ===== Scroll animation (3 levels: L1 -> L2 -> L3/open) ===== */
+(function(){
+  const L2 = 45; // рівень 2: фото 230px
+  const L3 = 55; // рівень 3: фото 150px, картка розкрита повністю
+  let tick = false;
+
+  function upd(){
+    tick = false;
+    const y2 = innerHeight * (1 - L2 / 100);
+    const y3 = innerHeight * (1 - L3 / 100);
+    const sts = document.querySelectorAll('.st');
+    sts.forEach(function(s){
+      const c = s.getBoundingClientRect().top + 170; // візуальний центр картки
+      const open = c <= y3;
+      s.classList.toggle('open', open);
+      s.classList.toggle('l2', open || c <= y2);     // рівень 3 включає рівень 2
+    });
+  }
+
+  const req = function(){
+    if (!tick) {
+      tick = true;
+      requestAnimationFrame(upd);
+    }
+  };
+
+  window.addEventListener('scroll', req, {passive: true});
+  window.addEventListener('resize', req);
+  window.updateCardAnimations = function(){
+    requestAnimationFrame(upd);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', upd);
+  } else {
+    setTimeout(upd, 100);
+  }
+})();

@@ -18,6 +18,12 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, jsonify, send_file, redirect
 
+import ssl
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+
 import atb_api
 import silpo_api
 import avrora_api

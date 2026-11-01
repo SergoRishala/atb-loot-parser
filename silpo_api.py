@@ -83,8 +83,14 @@ CITIES_BRANCHES = {
     }
 }
 
-DEFAULT_BRANCH_ID = CITIES_BRANCHES["Львів (вул. Кульпарківська, 226А / Victoria Gardens)"]["branchId"]
-BACKUP_BRANCH_ID = CITIES_BRANCHES["Київ (вул. Басейна, 6 / Центр)"]["branchId"]
+import ssl
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+
+DEFAULT_BRANCH_ID = CITIES_BRANCHES["Львів (вул. Стрийська, 45)"]["branchId"]
+BACKUP_BRANCH_ID = CITIES_BRANCHES["Львів (пл. Соборна, 14-15 / Центр)"]["branchId"]
 
 
 def get_image_url(icon: Optional[str], size: str = "300x300") -> str:
@@ -374,6 +380,8 @@ def get_silpo_promotions(branch_id: str = DEFAULT_BRANCH_ID, limit: int = 50, of
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             items = data.get("items", [])
+            if not items and branch_id != DEFAULT_BRANCH_ID:
+                return get_silpo_promotions(branch_id=DEFAULT_BRANCH_ID, limit=limit, offset=offset, timeout=timeout)
             normalized = []
             promo_name_map = {
                 "cinotyzhyky": "Цінотижики",

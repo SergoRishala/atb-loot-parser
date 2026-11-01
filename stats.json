@@ -1,15 +1,15 @@
 {
   "summary": {
-    "total_visits": 2,
-    "unique_visitors": 1,
-    "total_searches": 7,
-    "total_clicks": 0
+    "total_visits": 27,
+    "unique_visitors": 2,
+    "total_searches": 11,
+    "total_clicks": 3
   },
   "visitors": {
     "usr_juhoh9_iv2aj": {
       "first_seen": "2026-10-31 20:06:13",
-      "last_seen": "2026-10-31 20:44:09",
-      "visit_count": 2,
+      "last_seen": "2026-11-01 22:33:35",
+      "visit_count": 21,
       "ip": "127.0.0.1",
       "device_fingerprint": "fp_juhoh9",
       "is_bot": false,
@@ -42,23 +42,381 @@
         "old sp",
         "old spice",
         "/old spice",
+        ".old spice",
+        "old",
+        "old spice",
+        "/old spice",
         ".old spice"
       ],
+      "clicks_count": 3,
+      "products_viewed": 0,
+      "total_session_sec": 141980
+    },
+    "usr_7xgmhh_mmbmt": {
+      "first_seen": "2026-11-01 19:55:22",
+      "last_seen": "2026-11-01 22:23:51",
+      "visit_count": 6,
+      "ip": "172.20.10.1",
+      "device_fingerprint": "fp_7xgmhh",
+      "is_bot": false,
+      "device": {
+        "type": "Телефон",
+        "model": "iPhone 14/15/16 Pro Max / Plus",
+        "os": "iOS",
+        "osVersion": "18.7",
+        "browser": "Safari",
+        "browserVersion": "26.5.2",
+        "gpu": "Apple GPU",
+        "screenResolution": "430×932",
+        "viewportSize": "375×710",
+        "pixelRatio": "3.0",
+        "lang": "uk-UA",
+        "langs": "uk-UA",
+        "timezone": "Europe/Kiev",
+        "colorScheme": "Темна",
+        "connection": "Невідомо",
+        "hasTouch": true,
+        "touchPoints": 5,
+        "battery": "Не підтримується браузером",
+        "referrer": "Прямий перехід",
+        "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5.2 Mobile/15"
+      },
+      "searches": [],
       "clicks_count": 0,
       "products_viewed": 0,
-      "total_session_sec": 34143
+      "total_session_sec": 11959
     }
   },
   "search_queries": {
     "щд": 1,
-    "old": 1,
+    "old": 2,
     "old s": 1,
     "old sp": 1,
-    "old spice": 1,
-    "/old spice": 1,
-    ".old spice": 1
+    "old spice": 2,
+    "/old spice": 2,
+    ".old spice": 2
   },
   "recent_events": [
+    {
+      "time": "2026-11-01 22:22:51",
+      "visitor_id": "usr_7xgmhh_mmbmt",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "172.20.10.1",
+      "device": "iPhone 14/15/16 Pro Max / Plus (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 22:22:01",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 22:20:07",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 22:14:54",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 22:02:55",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 21:59:04",
+      "visitor_id": "usr_7xgmhh_mmbmt",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "172.20.10.1",
+      "device": "iPhone 14/15/16 Pro Max / Plus (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 21:58:42",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 21:58:25",
+      "visitor_id": "usr_7xgmhh_mmbmt",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "172.20.10.1",
+      "device": "iPhone 14/15/16 Pro Max / Plus (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 21:57:26",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 21:56:24",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 20:47:09",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 20:16:13",
+      "visitor_id": "usr_7xgmhh_mmbmt",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "172.20.10.1",
+      "device": "iPhone 14/15/16 Pro Max / Plus (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:55:26",
+      "visitor_id": "usr_7xgmhh_mmbmt",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "172.20.10.1",
+      "device": "iPhone 14/15/16 Pro Max / Plus (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:55:22",
+      "visitor_id": "usr_7xgmhh_mmbmt",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "172.20.10.1",
+      "device": "iPhone 14/15/16 Pro Max / Plus (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:52:35",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «.old spice»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:52:34",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «/old spice»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:51:19",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «old spice»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:51:17",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "search",
+      "details": "Пошук: «old»",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:50:31",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "click",
+      "details": "Клік: Фільтр магазинів: avrora,atb,silpo",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:50:29",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "click",
+      "details": "Клік: Фільтр магазинів: avrora,atb",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:50:28",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "click",
+      "details": "Клік: Фільтр магазинів: avrora",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:49:40",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:42:24",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:38:06",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 19:31:13",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:46:21",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:42:17",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:30:49",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:26:53",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:19:38",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:06:39",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
+    {
+      "time": "2026-11-01 17:02:58",
+      "visitor_id": "usr_juhoh9_iv2aj",
+      "custom_name": "",
+      "type": "visit",
+      "details": "Відкрив(ла) сайт",
+      "ip": "127.0.0.1",
+      "device": "Apple Mac (Safari)",
+      "is_bot": false
+    },
     {
       "time": "2026-10-31 20:10:13",
       "visitor_id": "usr_juhoh9_iv2aj",
